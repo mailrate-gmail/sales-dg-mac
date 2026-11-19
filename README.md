@@ -1,6 +1,6 @@
 # AI 会谈辅助系统
 
-本项目是一个本地单机运行的 AI 会谈辅助系统原型。系统在客户笔记本电脑本地运行 `client` 和 `server`，通过浏览器录音，后端使用本地 `faster-whisper` 完成语音转文字，使用 `SpeechBrain` 进行声纹识别，并通过 OpenAI Compatible 大模型 API 生成会谈建议回复和会后总结。
+本项目是一个本地单机运行的 AI 会谈辅助系统原型。系统在客户笔记本电脑本地运行 `client` 和 `server`，通过浏览器录音，后端默认使用本地 FunASR streaming 完成实时语音转文字，使用 SpeechBrain ECAPA 做说话人识别/聚类，并通过 OpenAI Compatible 大模型 API 生成会谈建议回复和会后总结。
 
 ![演示流程](docs/screenshots/demo-flow.svg)
 
@@ -16,7 +16,7 @@
 - 实时 final 文本默认使用 FunASR / ModelScope 中文标点恢复模型（`ct-punc`）；如切到 Whisper 等自身带标点的后端，也可选择信任 ASR 原始输出；会议室的“规则标点敏感度”仅用于实时字幕显示/规则模式；
 - 本地 SpeechBrain 声纹匹配；
 - 手动修正消息说话人；
-- 页面维护 LLM / Whisper / 声纹阈值 / 能量阈值配置；
+- 页面维护 LLM / ASR / 标点 / 声纹阈值 / 能量阈值配置；
 - 独立 ASR Provider 配置：FunASR streaming / faster-whisper / OCI Speech；
 - 独立标点 Provider 配置：`asr` / `funasr_punc` / `rule` / `off`，partial 实时字幕最多做规则轻补，final 文本走配置的标点恢复策略且前端不再二次补标点；
 - 可选 FunASR `cam++` 说话人分离能力可在前端“系统设置”中开启/关闭（也可通过 `SPEAKER_DIARIZATION_ENABLED` 设置默认值）；该模型较大，建议 Colima 分配约 12GB 内存后再开启；
@@ -33,8 +33,8 @@
 ```text
 前端：React + Vite + TypeScript
 后端：Python + FastAPI
-语音识别：faster-whisper
-声纹识别：SpeechBrain
+语音识别：FunASR streaming（默认）/ faster-whisper（短音频 fallback）
+声纹识别：SpeechBrain ECAPA，cam++ 可选增强说话人分离
 音频处理：ffmpeg
 大模型：OpenAI Compatible API
 部署：Docker Compose
@@ -81,10 +81,12 @@ cat > ~/.docker/config.json <<'EOF'
 }
 EOF
 
-colima start --cpu 4 --memory 8 --disk 60
+colima start --cpu 4 --memory 12 --disk 80
 docker compose version
 docker compose up -d --build
 ```
+
+> 如果不开启 `cam++`，Colima 8GB 通常也可以运行；如果计划在前端开启 `cam++ 说话人分离`，建议按上例分配约 12GB 内存。
 
 在公司网络、HTTPS 代理或安全网关环境下，Colima 虚拟机内可能缺少企业 CA 根证书，导致拉取镜像或构建时出现类似错误：
 
@@ -231,10 +233,29 @@ hf_cache/
 
 这些目录用于避免容器重建后重复下载 ASR 模型，已加入 `.gitignore`。
 
-## 6. 演示流程
+## 6. 说话人识别调参
+
+当前默认链路是：
+
+```text
+前端静音切分 → FunASR streaming 转写 → SpeechBrain ECAPA 声纹聚类 → 手动绑定 voice_xxx 到参会人
+```
+
+系统里有两个不同阈值：
+
+| 配置项 | 默认值 | 作用 | 调参建议 |
+| --- | --- | --- | --- |
+| `SPEAKER_THRESHOLD` / 已知参会人匹配阈值 | `0.30` | 将语音片段匹配到已录入声纹的参会人 | 误匹配到已知人时调高；匹配不上已知人时调低 |
+| `SPEAKER_CLUSTER_THRESHOLD` / 未知说话人聚类阈值 | `0.45` | 将未知说话人的多段语音合并成同一个 `voice_xxx` | 同一个人被拆成多个 ID 时调低到 `0.40` / `0.35`；不同人被合并时调高 |
+
+注意：ASR 和声纹识别都可能受噪音、麦克风距离、短音频、断句方式影响。系统不会把说话人归属视为绝对事实，建议保留人工绑定/修正流程。
+
+`cam++` 可在前端“系统设置”中开启，用于更细粒度地拆分同一段音频中的多人发言；它模型较大，建议仅在 Colima 分配约 12GB 内存并确有混合说话需求时开启。
+
+## 7. 演示流程
 
 1. 打开 `http://localhost:3000`；
-2. 在“模型配置”中检查 LLM、FunASR / Whisper、标点 Provider、声纹阈值、能量阈值；
+2. 在“模型配置”中检查 LLM、FunASR / Whisper、标点 Provider、已知参会人匹配阈值、未知说话人聚类阈值、能量阈值；
 3. 添加参会人，并设置角色：我方 / 客户 / 其他，勾选是否需要 AI 答复；
 4. 为参会人录入 10 秒左右声纹样本；
 5. 输入客户名称和会晤目标并点击“新建会议”；
@@ -246,6 +267,6 @@ hf_cache/
 11. 会后点击“生成会后总结”；
 12. 点击“导出会话”保存 Markdown 文件。
 
-## 7. 许可证
+## 8. 许可证
 
 本项目使用 [MIT License](LICENSE)。

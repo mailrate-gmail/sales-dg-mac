@@ -168,11 +168,11 @@ FastAPI 默认错误格式：
 
 ### POST `/api/meetings/{meeting_id}/audio`
 
-上传一段前端切分后的音频片段。后端会让 faster-whisper 基于 VAD/segments 继续断句，因此一次上传可能返回多条会话消息。后端会完成：
+上传一段前端切分后的音频片段。后端会按当前 `asr_provider` 分派到 FunASR streaming 或 faster-whisper；对于较长 final 音频，后端还会按静音/最大时长做二次切分，避免一条消息混入过长多说话人内容。后端会完成：
 
 1. 音频转 WAV；
-2. faster-whisper VAD + segments 转写；
-3. 声纹识别；
+2. ASR 转写与 final 标点恢复；
+3. SpeechBrain ECAPA 声纹识别/未知说话人聚类；
 4. 写入会议消息；
 5. 如该说话人需要 AI 回复，则生成建议回复。
 
@@ -537,10 +537,15 @@ curl -X POST \
   "oci_speech_config_file": "/root/.oci/config",
   "oci_speech_realtime_endpoint": "",
   "speaker_threshold": 0.3,
+  "speaker_cluster_threshold": 0.45,
+  "speaker_diarization_enabled": false,
   "energy_threshold": 0.008,
   "silence_duration_ms": 800,
   "min_speech_duration_ms": 1000,
-  "punctuation_sensitivity": 0.6
+  "punctuation_sensitivity": 0.6,
+  "punctuation_provider": "funasr_punc",
+  "punctuation_model": "ct-punc",
+  "punctuation_device": "cpu"
 }
 ```
 
@@ -548,7 +553,9 @@ curl -X POST \
 
 > **ASR 后端选择**：`asr_provider` 控制短音频上传接口（`POST /api/meetings/{id}/audio` 与 `POST /api/audio/process`）使用的引擎：`funasr_streaming`（默认）用本地 FunASR 流式模型整段识别；`faster_whisper` 用本地 faster-whisper 识别并返回带时间戳分段；`oci_speech` 尚未接入，返回 `501`。会议室实时流式 WebSocket 识别固定使用 FunASR，不受该字段影响。
 
-> **标点敏感度**：`punctuation_sensitivity` 范围 `0~1`，默认 `0.6`。数值越高，ASR final 文本越积极地补逗号/句号；会议室界面的滑块会通过 `PUT /api/config` 即时保存，后续 final 文本立即按新强度处理。
+> **标点 Provider**：`punctuation_provider` 支持 `funasr_punc` / `asr` / `rule` / `off`。实时 FunASR streaming 的原始 final 通常没有标点，因此默认使用 `funasr_punc`（`ct-punc`）为 final 文本补标点；前端不再对 final 文本二次补标点。`punctuation_sensitivity` 只影响规则标点和 partial 实时显示，不作为 final 文本的主控参数。
+
+> **说话人阈值**：`speaker_threshold` 用于匹配已录入声纹的参会人；`speaker_cluster_threshold` 用于将未知说话人的多段语音合并成同一个 `voice_xxx`。同一个人被拆成多个 ID 时可降低 `speaker_cluster_threshold`（如 `0.40` / `0.35`）；不同人被合并时可调高。`speaker_diarization_enabled` 控制可选 FunASR `cam++` 说话人分离，默认关闭。
 
 ### 7.2 更新模型配置
 
