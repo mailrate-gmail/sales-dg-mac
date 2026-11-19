@@ -37,7 +37,7 @@ from app.services.context_manager import context_manager
 from app.services.funasr_streaming import funasr_streaming_service
 from app.services.llm_client import llm_client
 from app.services.punctuation_model import get_punctuation_model, restore_final_punctuation
-from app.services.speaker_diarization import transcribe_speaker_segments
+from app.services.speaker_diarization import get_speaker_diarization_model, transcribe_speaker_segments
 from app.services.runtime_config import runtime_config
 from app.services.speaker import speaker_service
 from app.services.storage import storage
@@ -551,6 +551,8 @@ def update_config(payload: ModelConfig) -> ModelConfig:
         or previous.punctuation_device != saved.punctuation_device
     ):
         get_punctuation_model.cache_clear()
+    if previous.speaker_diarization_enabled != saved.speaker_diarization_enabled:
+        get_speaker_diarization_model.cache_clear()
     return mask_config(saved)
 
 

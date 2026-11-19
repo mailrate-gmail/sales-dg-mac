@@ -5,7 +5,6 @@
 """
 
 import logging
-import os
 import threading
 from functools import lru_cache
 from pathlib import Path
@@ -84,7 +83,7 @@ def get_speaker_diarization_model() -> FunASRSpeakerDiarizationModel:
 
 
 def transcribe_speaker_segments(wav_path: Path) -> list[dict[str, Any]]:
-    if os.getenv("SPEAKER_DIARIZATION_ENABLED", "false").lower() not in {"1", "true", "yes", "on"}:
+    if not runtime_config.get().speaker_diarization_enabled:
         return []
     try:
         return get_speaker_diarization_model().transcribe_segments(wav_path)

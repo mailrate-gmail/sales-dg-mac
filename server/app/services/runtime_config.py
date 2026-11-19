@@ -29,6 +29,7 @@ class RuntimeConfigService:
             oci_speech_config_file=settings.oci_speech_config_file,
             oci_speech_realtime_endpoint=settings.oci_speech_realtime_endpoint,
             speaker_threshold=settings.speaker_threshold,
+            speaker_diarization_enabled=settings.speaker_diarization_enabled,
             energy_threshold=settings.energy_threshold,
             silence_duration_ms=settings.silence_duration_ms,
             min_speech_duration_ms=settings.min_speech_duration_ms,

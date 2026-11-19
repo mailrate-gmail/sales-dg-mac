@@ -169,6 +169,7 @@ interface ModelConfig {
   oci_speech_config_file: string
   oci_speech_realtime_endpoint: string
   speaker_threshold: number
+  speaker_diarization_enabled: boolean
   energy_threshold: number
   silence_duration_ms: number
   min_speech_duration_ms: number
@@ -263,6 +264,7 @@ const defaultConfig: ModelConfig = {
   oci_speech_config_file: '/root/.oci/config',
   oci_speech_realtime_endpoint: '',
   speaker_threshold: 0.3,
+  speaker_diarization_enabled: false,
   energy_threshold: 0.008,
   silence_duration_ms: 800,
   min_speech_duration_ms: 1000,
@@ -1261,13 +1263,19 @@ export function App() {
 
           <div className="model-section-title">
             <h2>本地语音与识别参数</h2>
-            <span>控制 Whisper、声纹匹配和浏览器能量切分。</span>
+            <span>控制 Whisper、声纹匹配、可选 cam++ 说话人分离和浏览器能量切分。</span>
           </div>
           <div className="config-grid">
             <label>Whisper Model<input value={config.whisper_model} onChange={(e) => updateConfig('whisper_model', e.target.value)} /></label>
             <label>Whisper Device<input value={config.whisper_device} onChange={(e) => updateConfig('whisper_device', e.target.value)} /></label>
             <label>Whisper Compute Type<input value={config.whisper_compute_type} onChange={(e) => updateConfig('whisper_compute_type', e.target.value)} /></label>
             <label>声纹阈值<input type="number" step="0.01" value={config.speaker_threshold} onChange={(e) => updateConfig('speaker_threshold', Number(e.target.value))} /></label>
+            <label>cam++ 说话人分离
+              <select value={config.speaker_diarization_enabled ? 'on' : 'off'} onChange={(e) => updateConfig('speaker_diarization_enabled', e.target.value === 'on')}>
+                <option value="off">关闭（推荐，本地轻量）</option>
+                <option value="on">开启（需要 Colima 约 12GB 内存）</option>
+              </select>
+            </label>
             <label>能量阈值<input type="number" step="0.001" value={config.energy_threshold} onChange={(e) => updateConfig('energy_threshold', Number(e.target.value))} /></label>
             <label>语音间断切分 ms<input type="number" value={VOICE_GAP_SPLIT_MS} disabled readOnly /></label>
             <label>最短语音 ms<input type="number" value={config.min_speech_duration_ms} onChange={(e) => updateConfig('min_speech_duration_ms', Number(e.target.value))} /></label>
