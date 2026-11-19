@@ -88,6 +88,30 @@ type Role = 'self' | 'customer' | 'other' | 'unknown'
 type Page = 'new' | 'history' | 'modelSettings' | 'themeSettings' | 'room'
 type Theme = 'dark' | 'light' | 'blue'
 
+interface AppRoute {
+  page: Page
+  meetingId?: string
+}
+
+function routeFromHash(hash = window.location.hash): AppRoute {
+  const value = hash.replace(/^#/, '') || '/new'
+  if (value === '/history') return { page: 'history' }
+  if (value === '/settings/model') return { page: 'modelSettings' }
+  if (value === '/settings/theme') return { page: 'themeSettings' }
+  if (value === '/room') return { page: 'room' }
+  const meetingMatch = value.match(/^\/meetings\/([^/]+)$/)
+  if (meetingMatch) return { page: 'room', meetingId: decodeURIComponent(meetingMatch[1]) }
+  return { page: 'new' }
+}
+
+function hashForRoute(page: Page, meetingId?: string) {
+  if (page === 'history') return '#/history'
+  if (page === 'modelSettings') return '#/settings/model'
+  if (page === 'themeSettings') return '#/settings/theme'
+  if (page === 'room') return meetingId ? `#/meetings/${encodeURIComponent(meetingId)}` : '#/room'
+  return '#/new'
+}
+
 interface Participant {
   id: string
   name: string
@@ -307,7 +331,7 @@ function AgentMemoryBlock({ title, items }: { title: string; items: string[] }) 
 }
 
 export function App() {
-  const [page, setPage] = useState<Page>('new')
+  const [page, setPage] = useState<Page>(() => routeFromHash().page)
   const [theme, setTheme] = useState<Theme>('dark')
   const [menuCollapsed, setMenuCollapsed] = useState(false)
   const [customerName, setCustomerName] = useState('')
@@ -347,6 +371,7 @@ export function App() {
   const lastVoiceAtRef = useRef(0)
   const activeSessionIdRef = useRef('')
   const configRef = useRef(config)
+  const initialMeetingIdRef = useRef(routeFromHash().meetingId || '')
 
   useEffect(() => {
     configRef.current = config
@@ -357,8 +382,29 @@ export function App() {
   }, [theme])
 
   useEffect(() => {
+    if (!window.location.hash) {
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${hashForRoute(page)}`)
+    }
     loadConfig()
     loadSessions()
+    if (initialMeetingIdRef.current) {
+      void openSession(initialMeetingIdRef.current, false)
+    }
+  }, [])
+
+  useEffect(() => {
+    function handleHashChange() {
+      const route = routeFromHash()
+      if (route.page === 'room' && route.meetingId && route.meetingId !== activeSessionIdRef.current) {
+        void openSession(route.meetingId, false)
+        return
+      }
+      setPage(route.page)
+      if (route.page === 'history') void loadSessions()
+    }
+
+    window.addEventListener('hashchange', handleHashChange)
+    return () => window.removeEventListener('hashchange', handleHashChange)
   }, [])
 
   const recognizedSpeakers = useMemo(() => {
@@ -409,6 +455,15 @@ export function App() {
   async function loadConfig() {
     const res = await fetch(`${API_BASE}/api/config`)
     if (res.ok) setConfig(await res.json())
+  }
+
+  function navigateTo(nextPage: Page, meetingId = sessionId) {
+    setPage(nextPage)
+    if (nextPage === 'history') void loadSessions()
+    const nextHash = hashForRoute(nextPage, nextPage === 'room' ? meetingId : undefined)
+    if (window.location.hash !== nextHash) {
+      window.location.hash = nextHash
+    }
   }
 
   async function saveConfig() {
@@ -565,12 +620,12 @@ export function App() {
     setAgentMemory(null)
     setLatestSuggestion('')
     setSummary('')
-    setPage('room')
+    navigateTo('room', data.id)
     await loadSessions()
     await loadAgentMemory(data.id)
   }
 
-  async function openSession(id: string) {
+  async function openSession(id: string, updateUrl = true) {
     const res = await fetch(`${API_BASE}/api/sessions/${id}`)
     if (!res.ok) {
       alert('会议不存在')
@@ -594,7 +649,11 @@ export function App() {
     setLatestSuggestion([...data.messages].reverse().find((m) => m.ai_suggestion)?.ai_suggestion || '')
     setSpeakerNames({})
     setSpeakerPushTargets({})
-    setPage('room')
+    if (updateUrl) {
+      navigateTo('room', data.id)
+    } else {
+      setPage('room')
+    }
     await loadAgentMemory(data.id)
   }
 
@@ -1065,18 +1124,18 @@ export function App() {
           </button>
         </div>
         <nav className="main-menu">
-          <button title="新建会议" className={page === 'new' ? 'active' : ''} onClick={() => setPage('new')}><span>＋</span><b>新建会议</b></button>
-          <button title="历史会议" className={page === 'history' ? 'active' : ''} onClick={() => { setPage('history'); void loadSessions() }}><span>↺</span><b>历史会议</b></button>
+          <button title="新建会议" className={page === 'new' ? 'active' : ''} onClick={() => navigateTo('new')}><span>＋</span><b>新建会议</b></button>
+          <button title="历史会议" className={page === 'history' ? 'active' : ''} onClick={() => navigateTo('history')}><span>↺</span><b>历史会议</b></button>
           <div className={page === 'modelSettings' || page === 'themeSettings' ? 'menu-group active' : 'menu-group'}>
             <div className="menu-parent" title="系统配置"><span>⚙</span><b>系统配置</b></div>
             <div className="submenu">
-              <button title="模型配置" className={page === 'modelSettings' ? 'active' : ''} onClick={() => setPage('modelSettings')}><span>◦</span><b>模型配置</b></button>
-              <button title="主题风格" className={page === 'themeSettings' ? 'active' : ''} onClick={() => setPage('themeSettings')}><span>◦</span><b>主题风格</b></button>
+              <button title="模型配置" className={page === 'modelSettings' ? 'active' : ''} onClick={() => navigateTo('modelSettings')}><span>◦</span><b>模型配置</b></button>
+              <button title="主题风格" className={page === 'themeSettings' ? 'active' : ''} onClick={() => navigateTo('themeSettings')}><span>◦</span><b>主题风格</b></button>
             </div>
           </div>
         </nav>
         {sessionId && (
-          <button title="返回会议室" className={page === 'room' ? 'active room-entry' : 'room-entry'} onClick={() => setPage('room')}>
+          <button title="返回会议室" className={page === 'room' ? 'active room-entry' : 'room-entry'} onClick={() => navigateTo('room')}>
             <span>↗</span><b>返回会议室</b>
           </button>
         )}
