@@ -215,7 +215,7 @@ class ModelConfig(BaseModel):
     silence_duration_ms: int = 800
     min_speech_duration_ms: int = 1000
     punctuation_sensitivity: float = Field(default=0.6, ge=0.0, le=1.0)
-    punctuation_provider: PunctuationProvider = "asr"
+    punctuation_provider: PunctuationProvider = "funasr_punc"
     punctuation_model: str = "ct-punc"
     punctuation_device: str = "cpu"
 

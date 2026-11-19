@@ -13,7 +13,7 @@
 - 录入参会人声纹样本；
 - 基于浏览器 WebAudio 采集，按语音停顿 0.8s 切分；
 - 本地 FunASR streaming 实时转写（faster-whisper 作为短音频 fallback）；
-- final 文本默认信任 ASR / Whisper / FunASR diarization 输出的原始标点，也可切换到 FunASR / ModelScope 中文标点恢复模型（`ct-punc`）或本地轻量规则标点；会议室的“规则标点敏感度”仅用于实时字幕显示/规则模式；
+- 实时 final 文本默认使用 FunASR / ModelScope 中文标点恢复模型（`ct-punc`）；如切到 Whisper 等自身带标点的后端，也可选择信任 ASR 原始输出；会议室的“规则标点敏感度”仅用于实时字幕显示/规则模式；
 - 本地 SpeechBrain 声纹匹配；
 - 手动修正消息说话人；
 - 页面维护 LLM / Whisper / 声纹阈值 / 能量阈值配置；

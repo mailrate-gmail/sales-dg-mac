@@ -269,7 +269,7 @@ const defaultConfig: ModelConfig = {
   silence_duration_ms: 800,
   min_speech_duration_ms: 1000,
   punctuation_sensitivity: 0.6,
-  punctuation_provider: 'asr',
+  punctuation_provider: 'funasr_punc',
   punctuation_model: 'ct-punc',
   punctuation_device: 'cpu',
 }
@@ -1245,8 +1245,8 @@ export function App() {
             <label>FunASR Device<input value={config.funasr_device} onChange={(e) => updateConfig('funasr_device', e.target.value)} /></label>
             <label>标点 Provider
               <select value={config.punctuation_provider} onChange={(e) => updateConfig('punctuation_provider', e.target.value as ModelConfig['punctuation_provider'])}>
-                <option value="asr">ASR / Whisper 原始标点（推荐）</option>
-                <option value="funasr_punc">FunASR / ModelScope 标点模型（final）</option>
+                <option value="funasr_punc">FunASR / ModelScope 标点模型（实时 final 推荐）</option>
+                <option value="asr">ASR / Whisper 原始标点（FunASR streaming 通常无标点）</option>
                 <option value="rule">规则标点</option>
                 <option value="off">关闭标点恢复</option>
               </select>
