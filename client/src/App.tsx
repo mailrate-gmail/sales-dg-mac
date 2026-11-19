@@ -1342,13 +1342,21 @@ export function App() {
           </label>
           <label>标点模型<input value={config.punctuation_model} onChange={(e) => updateConfig('punctuation_model', e.target.value)} /></label>
           <label>标点设备<input value={config.punctuation_device} onChange={(e) => updateConfig('punctuation_device', e.target.value)} /></label>
-          <label>OCI Region<input placeholder="us-ashburn-1" value={config.oci_speech_region} onChange={(e) => updateConfig('oci_speech_region', e.target.value)} /></label>
-          <label>OCI Compartment OCID<input value={config.oci_speech_compartment_id} onChange={(e) => updateConfig('oci_speech_compartment_id', e.target.value)} /></label>
-          <label>OCI Language<input value={config.oci_speech_language} onChange={(e) => updateConfig('oci_speech_language', e.target.value)} /></label>
-          <label>OCI Profile<input value={config.oci_speech_profile} onChange={(e) => updateConfig('oci_speech_profile', e.target.value)} /></label>
-          <label>OCI Config File<input value={config.oci_speech_config_file} onChange={(e) => updateConfig('oci_speech_config_file', e.target.value)} /></label>
-          <label>OCI Realtime Endpoint<input placeholder="wss://realtime.aiservice.<region>.oci.oraclecloud.com/..." value={config.oci_speech_realtime_endpoint} onChange={(e) => updateConfig('oci_speech_realtime_endpoint', e.target.value)} /></label>
         </div>
+        <details className="advanced-settings">
+          <summary>
+            <span>OCI Speech 配置</span>
+            <small>云端 ASR 预留参数，当前本地实时识别不需要配置</small>
+          </summary>
+          <div className="config-grid">
+            <label>OCI Region<input placeholder="us-ashburn-1" value={config.oci_speech_region} onChange={(e) => updateConfig('oci_speech_region', e.target.value)} /></label>
+            <label>OCI Compartment OCID<input value={config.oci_speech_compartment_id} onChange={(e) => updateConfig('oci_speech_compartment_id', e.target.value)} /></label>
+            <label>OCI Language<input value={config.oci_speech_language} onChange={(e) => updateConfig('oci_speech_language', e.target.value)} /></label>
+            <label>OCI Profile<input value={config.oci_speech_profile} onChange={(e) => updateConfig('oci_speech_profile', e.target.value)} /></label>
+            <label>OCI Config File<input value={config.oci_speech_config_file} onChange={(e) => updateConfig('oci_speech_config_file', e.target.value)} /></label>
+            <label>OCI Realtime Endpoint<input placeholder="wss://realtime.aiservice.<region>.oci.oraclecloud.com/..." value={config.oci_speech_realtime_endpoint} onChange={(e) => updateConfig('oci_speech_realtime_endpoint', e.target.value)} /></label>
+          </div>
+        </details>
         <div className="model-actions">
           <button onClick={saveConfig}>保存 ASR 配置</button>
         </div>

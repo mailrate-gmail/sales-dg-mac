@@ -533,6 +533,37 @@ code {
   margin-bottom: 12px;
 }
 
+.advanced-settings {
+  margin: 2px 0 16px;
+  padding: 12px 14px;
+  background: var(--panel-soft);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.advanced-settings summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text);
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.advanced-settings summary span {
+  font-weight: 600;
+}
+
+.advanced-settings summary small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.advanced-settings .config-grid {
+  margin: 14px 0 0;
+}
+
 .connection-summary {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
