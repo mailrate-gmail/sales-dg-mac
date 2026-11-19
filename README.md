@@ -20,6 +20,7 @@
 - 独立 ASR Provider 配置：FunASR streaming / faster-whisper / OCI Speech；
 - 独立标点 Provider 配置：`asr` / `funasr_punc` / `rule` / `off`，partial 实时字幕最多做规则轻补，final 文本走配置的标点恢复策略且前端不再二次补标点；
 - 可选 FunASR `cam++` 说话人分离能力可在前端“系统设置”中开启/关闭（也可通过 `SPEAKER_DIARIZATION_ENABLED` 设置默认值）；该模型较大，建议 Colima 分配约 12GB 内存后再开启；
+- 未知说话人聚类阈值默认 `0.45`，数值越低越容易把同一人的多段语音合并，数值越高越容易拆成多个 `voice_xxx`；
 - 本地会话分析（无需本地 LLM）：说明/示例/解释等内容不触发 AI 回复，但进入上下文摘要；
 - 只有「指定参会人 + 本地判定为问题/明确请求」才调用远程 LLM 生成 AI 建议回复；
 - 客户发言白色展示，我方发言黄色展示；

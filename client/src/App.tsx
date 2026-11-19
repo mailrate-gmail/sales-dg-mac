@@ -169,6 +169,7 @@ interface ModelConfig {
   oci_speech_config_file: string
   oci_speech_realtime_endpoint: string
   speaker_threshold: number
+  speaker_cluster_threshold: number
   speaker_diarization_enabled: boolean
   energy_threshold: number
   silence_duration_ms: number
@@ -264,6 +265,7 @@ const defaultConfig: ModelConfig = {
   oci_speech_config_file: '/root/.oci/config',
   oci_speech_realtime_endpoint: '',
   speaker_threshold: 0.3,
+  speaker_cluster_threshold: 0.45,
   speaker_diarization_enabled: false,
   energy_threshold: 0.008,
   silence_duration_ms: 800,
@@ -1269,7 +1271,8 @@ export function App() {
             <label>Whisper Model<input value={config.whisper_model} onChange={(e) => updateConfig('whisper_model', e.target.value)} /></label>
             <label>Whisper Device<input value={config.whisper_device} onChange={(e) => updateConfig('whisper_device', e.target.value)} /></label>
             <label>Whisper Compute Type<input value={config.whisper_compute_type} onChange={(e) => updateConfig('whisper_compute_type', e.target.value)} /></label>
-            <label>声纹阈值<input type="number" step="0.01" value={config.speaker_threshold} onChange={(e) => updateConfig('speaker_threshold', Number(e.target.value))} /></label>
+            <label>已知参会人匹配阈值<input type="number" step="0.01" min="0" max="1" value={config.speaker_threshold} onChange={(e) => updateConfig('speaker_threshold', Number(e.target.value))} /></label>
+            <label>未知说话人聚类阈值<input type="number" step="0.01" min="0" max="1" value={config.speaker_cluster_threshold} onChange={(e) => updateConfig('speaker_cluster_threshold', Number(e.target.value))} /></label>
             <label>cam++ 说话人分离
               <select value={config.speaker_diarization_enabled ? 'on' : 'off'} onChange={(e) => updateConfig('speaker_diarization_enabled', e.target.value === 'on')}>
                 <option value="off">关闭（推荐，本地轻量）</option>

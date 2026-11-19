@@ -115,7 +115,6 @@ def reusable_unknown_speaker_id(session: Session) -> str:
     return f"voice_{uuid4().hex[:8]}"
 
 
-UNKNOWN_SPEAKER_THRESHOLD = 0.55
 # ECAPA 在过短音频上的 embedding 不可靠；短于该时长时跳过声纹识别/聚类，
 # 避免误匹配已知参会人或把同一人拆成多个 ID。
 MIN_SPEAKER_EMBEDDING_SECONDS = 3.0
@@ -237,7 +236,7 @@ def identify_unknown_speaker(session: Session, wav_path: Path) -> tuple[str, flo
         speaker_id, score, embedding = speaker_service.identify_embedding(
             wav_path,
             embedding_files,
-            UNKNOWN_SPEAKER_THRESHOLD,
+            runtime_config.get().speaker_cluster_threshold,
         )
     except Exception as exc:
         # 声纹模型下载/加载失败时，不应阻断 ASR 结果返回；降级复用最近 unknown speaker。

@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     oci_speech_realtime_endpoint: str = ""
 
     speaker_threshold: float = 0.30
+    speaker_cluster_threshold: float = 0.45
     speaker_diarization_enabled: bool = False
     energy_threshold: float = 0.008
     silence_duration_ms: int = 800
