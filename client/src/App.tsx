@@ -85,7 +85,7 @@ function displayTranscriptText(text: string) {
 }
 
 type Role = 'self' | 'customer' | 'other' | 'unknown'
-type Page = 'new' | 'history' | 'settings' | 'room'
+type Page = 'new' | 'history' | 'modelSettings' | 'themeSettings' | 'room'
 type Theme = 'dark' | 'light' | 'blue'
 
 interface Participant {
@@ -1067,7 +1067,13 @@ export function App() {
         <nav className="main-menu">
           <button title="新建会议" className={page === 'new' ? 'active' : ''} onClick={() => setPage('new')}><span>＋</span><b>新建会议</b></button>
           <button title="历史会议" className={page === 'history' ? 'active' : ''} onClick={() => { setPage('history'); void loadSessions() }}><span>↺</span><b>历史会议</b></button>
-          <button title="系统设置" className={page === 'settings' ? 'active' : ''} onClick={() => setPage('settings')}><span>⚙</span><b>系统设置</b></button>
+          <div className={page === 'modelSettings' || page === 'themeSettings' ? 'menu-group active' : 'menu-group'}>
+            <div className="menu-parent" title="系统配置"><span>⚙</span><b>系统配置</b></div>
+            <div className="submenu">
+              <button title="模型配置" className={page === 'modelSettings' ? 'active' : ''} onClick={() => setPage('modelSettings')}><span>◦</span><b>模型配置</b></button>
+              <button title="主题风格" className={page === 'themeSettings' ? 'active' : ''} onClick={() => setPage('themeSettings')}><span>◦</span><b>主题风格</b></button>
+            </div>
+          </div>
         </nav>
         {sessionId && (
           <button title="返回会议室" className={page === 'room' ? 'active room-entry' : 'room-entry'} onClick={() => setPage('room')}>
@@ -1079,7 +1085,8 @@ export function App() {
       <main className="content">
         {page === 'new' && renderNewMeeting()}
         {page === 'history' && renderHistory()}
-        {page === 'settings' && renderSettings()}
+        {page === 'modelSettings' && renderModelSettings()}
+        {page === 'themeSettings' && renderThemeSettings()}
         {page === 'room' && renderMeetingRoom()}
       </main>
     </div>
@@ -1129,7 +1136,7 @@ export function App() {
     )
   }
 
-  function renderSettings() {
+  function renderModelSettings() {
     return (
       <div className="settings-stack">
         <section className="page-card">
@@ -1286,19 +1293,23 @@ export function App() {
             <label>最短语音 ms<input type="number" value={config.min_speech_duration_ms} onChange={(e) => updateConfig('min_speech_duration_ms', Number(e.target.value))} /></label>
           </div>
         </section>
-
-        <section className="page-card">
-          <div className="page-title">
-            <h1>系统主题风格</h1>
-            <p>切换本地页面的显示风格，不影响后端数据。</p>
-          </div>
-          <div className="theme-options">
-            <button className={theme === 'dark' ? 'active' : ''} onClick={() => setTheme('dark')}>深色商务</button>
-            <button className={theme === 'light' ? 'active' : ''} onClick={() => setTheme('light')}>浅色简洁</button>
-            <button className={theme === 'blue' ? 'active' : ''} onClick={() => setTheme('blue')}>蓝色科技</button>
-          </div>
-        </section>
       </div>
+    )
+  }
+
+  function renderThemeSettings() {
+    return (
+      <section className="page-card">
+        <div className="page-title">
+          <h1>系统主题风格</h1>
+          <p>切换本地页面的显示风格，不影响后端数据。</p>
+        </div>
+        <div className="theme-options">
+          <button className={theme === 'dark' ? 'active' : ''} onClick={() => setTheme('dark')}>深色商务</button>
+          <button className={theme === 'light' ? 'active' : ''} onClick={() => setTheme('light')}>浅色简洁</button>
+          <button className={theme === 'blue' ? 'active' : ''} onClick={() => setTheme('blue')}>蓝色科技</button>
+        </div>
+      </section>
     )
   }
 

@@ -189,6 +189,7 @@ code {
 }
 
 .main-menu button,
+.menu-parent,
 .room-entry {
   width: 100%;
   text-align: left;
@@ -201,6 +202,7 @@ code {
 }
 
 .main-menu button span,
+.menu-parent span,
 .room-entry span {
   display: inline-flex;
   align-items: center;
@@ -210,16 +212,43 @@ code {
 }
 
 .main-menu button b,
+.menu-parent b,
 .room-entry b {
   font-weight: 500;
 }
 
 .main-menu button:hover,
+.menu-parent:hover,
 .room-entry:hover,
 .main-menu button.active,
+.menu-group.active .menu-parent,
 .room-entry.active {
   background: var(--panel-soft);
   border-color: var(--border);
+}
+
+.menu-group {
+  display: grid;
+  gap: 6px;
+}
+
+.menu-parent {
+  cursor: default;
+}
+
+.submenu {
+  display: grid;
+  gap: 6px;
+  padding-left: 20px;
+}
+
+.submenu button {
+  padding-block: 8px;
+  color: var(--muted);
+}
+
+.submenu button.active {
+  color: var(--text);
 }
 
 .room-entry {
@@ -241,14 +270,20 @@ code {
 }
 
 .menu-collapsed .main-menu button,
+.menu-collapsed .menu-parent,
 .menu-collapsed .room-entry {
   justify-content: center;
   padding-inline: 0;
 }
 
 .menu-collapsed .main-menu button b,
+.menu-collapsed .menu-parent b,
 .menu-collapsed .room-entry b {
   display: none;
+}
+
+.menu-collapsed .submenu {
+  padding-left: 0;
 }
 
 .content {
