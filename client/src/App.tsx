@@ -1175,7 +1175,44 @@ export function App() {
 
           <div className="model-section-title">
             <h2>当前 LLM 连接</h2>
-            <span>保存后，当前 Provider/Model/Base URL 会自动显示在“模型可用性”区域。</span>
+            <span>展示当前会被会议助手用于 AI 回复、总结和连接测试的 LLM。</span>
+          </div>
+          <div className="connection-summary">
+            <div>
+              <span>Provider</span>
+              <strong>{config.llm_provider || '-'}</strong>
+            </div>
+            <div>
+              <span>Model</span>
+              <strong>{config.llm_model || '-'}</strong>
+            </div>
+            <div>
+              <span>接口类型</span>
+              <strong>{config.llm_api_type === 'responses' ? 'Responses' : 'Chat Completions'}</strong>
+            </div>
+            <div>
+              <span>Base URL</span>
+              <code>{config.llm_base_url || '-'}</code>
+            </div>
+            <div>
+              <span>API Key</span>
+              <strong>{config.llm_api_key ? '已配置' : '未配置'}</strong>
+            </div>
+            <div>
+              <span>请求超时</span>
+              <strong>{config.llm_timeout_seconds}s</strong>
+            </div>
+          </div>
+          <div className="model-actions">
+            <button className="secondary-action" disabled={testingConnection} onClick={testModelConnection}>
+              {testingConnection ? '测试中...' : '测试当前 LLM 连接'}
+            </button>
+          </div>
+          {connectionTest && <div className="connection-result">{connectionTest}</div>}
+
+          <div className="model-section-title">
+            <h2>LLM 连接配置</h2>
+            <span>修改 Provider、模型、Base URL、接口类型和 API Key；保存后会同步到“当前 LLM 连接”和“模型可用性”。</span>
           </div>
           <div className="config-grid">
             <label>LLM Provider<input value={config.llm_provider} onChange={(e) => updateConfig('llm_provider', e.target.value)} /></label>
@@ -1194,11 +1231,7 @@ export function App() {
 
           <div className="model-actions">
             <button onClick={saveConfig}>保存模型配置</button>
-            <button className="secondary-action" disabled={testingConnection} onClick={testModelConnection}>
-              {testingConnection ? '测试中...' : '测试连接'}
-            </button>
           </div>
-          {connectionTest && <div className="connection-result">{connectionTest}</div>}
 
           <div className="model-section-title">
             <h2>ASR Provider 配置</h2>
