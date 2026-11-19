@@ -13,13 +13,13 @@
 - 录入参会人声纹样本；
 - 基于浏览器 WebAudio 采集，按语音停顿 0.8s 切分；
 - 本地 FunASR streaming 实时转写（faster-whisper 作为短音频 fallback）；
-- 实时 final 文本默认使用 FunASR / ModelScope 中文标点恢复模型（`ct-punc`）；如切到 Whisper 等自身带标点的后端，也可选择信任 ASR 原始输出；会议室的“规则标点敏感度”仅用于实时字幕显示/规则模式；
+- 实时 final 文本默认使用 FunASR 中文标点恢复模型（当前缓存为 ModelScope `ct-punc`）；如切到 Whisper 等自身带标点的后端，也可选择信任 ASR 原始输出；partial 实时字幕最多做保守规则轻补，final 文本不再由前端二次补标点；
 - 本地 SpeechBrain 声纹匹配；
 - 手动修正消息说话人；
 - 页面维护 LLM / ASR / 标点 / 声纹阈值 / 能量阈值配置；
 - 独立 ASR Provider 配置：FunASR streaming / faster-whisper / OCI Speech；
 - 独立标点 Provider 配置：`asr` / `funasr_punc` / `rule` / `off`，partial 实时字幕最多做规则轻补，final 文本走配置的标点恢复策略且前端不再二次补标点；
-- 可选 FunASR `cam++` 说话人分离能力可在前端“系统设置”中开启/关闭（也可通过 `SPEAKER_DIARIZATION_ENABLED` 设置默认值）；该模型较大，建议 Colima 分配约 12GB 内存后再开启；
+- 可选 FunASR `cam++` / `campplus` 说话人分离能力可在前端“系统配置 → 语音识别参数”中开启/关闭（也可通过 `SPEAKER_DIARIZATION_ENABLED` 设置默认值）；该链路已改用 HuggingFace 模型源，首次触发会下载 `funasr/paraformer-zh`、`funasr/fsmn-vad`、`funasr/campplus`，建议 Colima 分配约 12GB 内存后再开启；
 - 未知说话人聚类阈值默认 `0.45`，数值越低越容易把同一人的多段语音合并，数值越高越容易拆成多个 `voice_xxx`；
 - 本地会话分析（无需本地 LLM）：说明/示例/解释等内容不触发 AI 回复，但进入上下文摘要；
 - 只有「指定参会人 + 本地判定为问题/明确请求」才调用远程 LLM 生成 AI 建议回复；
@@ -224,14 +224,25 @@ data/
 └── exports/
 ```
 
-FunASR / ModelScope 模型缓存会保存在：
+模型缓存会保存在：
 
 ```text
-model_cache/
-hf_cache/
+model_cache/             # ModelScope 缓存；当前主要保留已下载的 ct-punc 标点模型
+hf_cache/                # HuggingFace 缓存；FunASR streaming、ECAPA、cam++ diarization 新模型源
 ```
 
 这些目录用于避免容器重建后重复下载 ASR 模型，已加入 `.gitignore`。
+
+当前模型来源约定：
+
+| 功能 | 模型 | 来源 |
+| --- | --- | --- |
+| 实时 ASR | `funasr/paraformer-zh-streaming` | HuggingFace |
+| final 标点 | `ct-punc` | 当前仍使用已缓存的 ModelScope 模型 |
+| 声纹匹配/聚类 | `speechbrain/spkrec-ecapa-voxceleb` | HuggingFace |
+| 可选 cam++ diarization | `funasr/paraformer-zh` + `funasr/fsmn-vad` + `funasr/campplus` | HuggingFace |
+
+> 计划：后续将 `ct-punc` 标点恢复也切换到 HuggingFace `funasr/ct-punc`，届时可清理剩余 ModelScope 缓存，实现模型源统一。
 
 ## 6. 说话人识别调参
 
@@ -250,7 +261,7 @@ hf_cache/
 
 注意：ASR 和声纹识别都可能受噪音、麦克风距离、短音频、断句方式影响。系统不会把说话人归属视为绝对事实，建议保留人工绑定/修正流程。
 
-`cam++` 可在前端“系统设置”中开启，用于更细粒度地拆分同一段音频中的多人发言；它模型较大，建议仅在 Colima 分配约 12GB 内存并确有混合说话需求时开启。
+`cam++` 可在前端“系统配置 → 语音识别参数”中开启，用于更细粒度地拆分同一段音频中的多人发言；当前实现使用 HuggingFace 上的 FunASR 组合模型（`funasr/paraformer-zh`、`funasr/fsmn-vad`、`funasr/campplus`，内部标点如启用会使用 `funasr/ct-punc`），建议仅在 Colima 分配约 12GB 内存并确有混合说话需求时开启。默认仍推荐使用 ECAPA 聚类链路。
 
 ## 7. 演示流程
 
