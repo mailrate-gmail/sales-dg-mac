@@ -2,6 +2,7 @@ from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 import asyncio
+import logging
 import wave
 import numpy as np
 
@@ -35,13 +36,14 @@ from app.services.config_view import mask_config, unmask_api_key
 from app.services.context_manager import context_manager
 from app.services.funasr_streaming import funasr_streaming_service
 from app.services.llm_client import llm_client
-from app.services.punctuation import restore_punctuation
+from app.services.punctuation_model import get_punctuation_model, restore_final_punctuation
 from app.services.runtime_config import runtime_config
 from app.services.speaker import speaker_service
 from app.services.storage import storage
 from app.services.text_merge import merge_stream_text
 
 app = FastAPI(title="AI Meeting Assistant")
+logger = logging.getLogger(__name__)
 
 app.add_middleware(
     CORSMiddleware,
@@ -115,7 +117,7 @@ def reusable_unknown_speaker_id(session: Session) -> str:
 UNKNOWN_SPEAKER_THRESHOLD = 0.55
 # ECAPA 在过短音频上的 embedding 不可靠；短于该时长时跳过声纹识别/聚类，
 # 避免误匹配已知参会人或把同一人拆成多个 ID。
-MIN_SPEAKER_EMBEDDING_SECONDS = 1.5
+MIN_SPEAKER_EMBEDDING_SECONDS = 3.0
 
 
 def wav_duration_seconds(path: Path) -> float:
@@ -149,8 +151,9 @@ def identify_unknown_speaker(session: Session, wav_path: Path) -> tuple[str, flo
             embedding_files,
             UNKNOWN_SPEAKER_THRESHOLD,
         )
-    except Exception:
+    except Exception as exc:
         # 声纹模型下载/加载失败时，不应阻断 ASR 结果返回；降级复用最近 unknown speaker。
+        logger.warning("未知说话人声纹聚类失败，降级复用最近 unknown speaker：%s", exc)
         return reusable_unknown_speaker_id(session), 0.0
     if speaker_id:
         return speaker_id, score
@@ -180,8 +183,9 @@ def collect_speaker_fields(
     participants = load_participants()
     try:
         speaker, score = speaker_service.identify(wav_path, participants)
-    except Exception:
+    except Exception as exc:
         # 声纹模型下载/加载失败时不应阻断 ASR 结果返回。
+        logger.warning("参会人声纹识别失败，降级为未知说话人：%s", exc)
         speaker, score = None, 0.0
 
     if speaker:
@@ -212,7 +216,7 @@ def structured_context_for_session(session: Session) -> str:
 
 
 def restore_asr_text(text: str) -> str:
-    return restore_punctuation(text, sensitivity=runtime_config.get().punctuation_sensitivity)
+    return restore_final_punctuation(text)
 
 
 async def create_message_from_text_audio(
@@ -367,7 +371,13 @@ def get_config() -> ModelConfig:
 
 @app.put("/api/config", response_model=ModelConfig)
 def update_config(payload: ModelConfig) -> ModelConfig:
+    previous = runtime_config.get()
     saved = runtime_config.save(unmask_api_key(payload))
+    if (
+        previous.punctuation_model != saved.punctuation_model
+        or previous.punctuation_device != saved.punctuation_device
+    ):
+        get_punctuation_model.cache_clear()
     return mask_config(saved)
 
 

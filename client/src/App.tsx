@@ -173,6 +173,9 @@ interface ModelConfig {
   silence_duration_ms: number
   min_speech_duration_ms: number
   punctuation_sensitivity: number
+  punctuation_provider: 'funasr_punc' | 'rule' | 'off'
+  punctuation_model: string
+  punctuation_device: string
 }
 
 interface CustomModelConfig {
@@ -264,6 +267,9 @@ const defaultConfig: ModelConfig = {
   silence_duration_ms: 800,
   min_speech_duration_ms: 1000,
   punctuation_sensitivity: 0.6,
+  punctuation_provider: 'funasr_punc',
+  punctuation_model: 'ct-punc',
+  punctuation_device: 'cpu',
 }
 
 const modelPresets: ModelPreset[] = [
@@ -1235,6 +1241,15 @@ export function App() {
             </label>
             <label>FunASR Model<input value={config.funasr_model} onChange={(e) => updateConfig('funasr_model', e.target.value)} /></label>
             <label>FunASR Device<input value={config.funasr_device} onChange={(e) => updateConfig('funasr_device', e.target.value)} /></label>
+            <label>标点 Provider
+              <select value={config.punctuation_provider} onChange={(e) => updateConfig('punctuation_provider', e.target.value as ModelConfig['punctuation_provider'])}>
+                <option value="funasr_punc">FunASR / ModelScope 标点模型（final）</option>
+                <option value="rule">规则标点</option>
+                <option value="off">关闭标点恢复</option>
+              </select>
+            </label>
+            <label>标点模型<input value={config.punctuation_model} onChange={(e) => updateConfig('punctuation_model', e.target.value)} /></label>
+            <label>标点设备<input value={config.punctuation_device} onChange={(e) => updateConfig('punctuation_device', e.target.value)} /></label>
             <label>OCI Region<input placeholder="us-ashburn-1" value={config.oci_speech_region} onChange={(e) => updateConfig('oci_speech_region', e.target.value)} /></label>
             <label>OCI Compartment OCID<input value={config.oci_speech_compartment_id} onChange={(e) => updateConfig('oci_speech_compartment_id', e.target.value)} /></label>
             <label>OCI Language<input value={config.oci_speech_language} onChange={(e) => updateConfig('oci_speech_language', e.target.value)} /></label>

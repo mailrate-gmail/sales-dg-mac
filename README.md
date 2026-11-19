@@ -13,11 +13,12 @@
 - 录入参会人声纹样本；
 - 基于浏览器 WebAudio 采集，按语音停顿 0.8s 切分；
 - 本地 FunASR streaming 实时转写（faster-whisper 作为短音频 fallback）；
-- final 文本本地轻量标点恢复，会议室可实时调整“标点敏感度”以控制补标点强度；
+- final 文本支持 FunASR / ModelScope 中文标点恢复模型（默认 `ct-punc`），并保留本地轻量规则标点作为 fallback；会议室可实时调整规则标点敏感度；
 - 本地 SpeechBrain 声纹匹配；
 - 手动修正消息说话人；
 - 页面维护 LLM / Whisper / 声纹阈值 / 能量阈值配置；
 - 独立 ASR Provider 配置：FunASR streaming / faster-whisper / OCI Speech；
+- 独立标点 Provider 配置：`funasr_punc` / `rule` / `off`，partial 实时字幕最多做规则轻补，final 文本走配置的标点恢复策略；
 - 本地会话分析（无需本地 LLM）：说明/示例/解释等内容不触发 AI 回复，但进入上下文摘要；
 - 只有「指定参会人 + 本地判定为问题/明确请求」才调用远程 LLM 生成 AI 建议回复；
 - 客户发言白色展示，我方发言黄色展示；
@@ -62,6 +63,34 @@ LLM_API_KEY=你的API_KEY
 ```bash
 docker compose up -d --build
 ```
+
+#### macOS：Colima + Docker Compose
+
+如果 macOS 本机没有 Docker Desktop，也可以使用 Colima 提供本地 Docker daemon，再配合 Docker Compose 启动：
+
+```bash
+brew install docker docker-compose colima
+mkdir -p ~/.docker
+cat > ~/.docker/config.json <<'EOF'
+{
+  "cliPluginsExtraDirs": [
+    "/opt/homebrew/lib/docker/cli-plugins"
+  ]
+}
+EOF
+
+colima start --cpu 4 --memory 8 --disk 60
+docker compose version
+docker compose up -d --build
+```
+
+在公司网络、HTTPS 代理或安全网关环境下，Colima 虚拟机内可能缺少企业 CA 根证书，导致拉取镜像或构建时出现类似错误：
+
+```text
+x509: certificate signed by unknown authority
+```
+
+遇到这种情况，可以请 OpenCode 帮忙检查并处理 CA 证书问题，例如将 macOS 钥匙串中的受信任证书导入 Colima 虚拟机的系统信任库，并在必要时重启 Colima 后重新执行构建。
 
 默认使用开发模式（`server/Dockerfile.dev`、`client/Dockerfile.dev`）：容器只提供运行依赖环境，源码通过 bind mount 从本机实时映射，**修改 `server/app` 或 `client/src` 下的代码无需重建镜像**（后端自动重启、前端 HMR 热更新）。
 
@@ -203,7 +232,7 @@ hf_cache/
 ## 6. 演示流程
 
 1. 打开 `http://localhost:3000`；
-2. 在“模型配置”中检查 LLM、FunASR / Whisper、声纹阈值、能量阈值；
+2. 在“模型配置”中检查 LLM、FunASR / Whisper、标点 Provider、声纹阈值、能量阈值；
 3. 添加参会人，并设置角色：我方 / 客户 / 其他，勾选是否需要 AI 答复；
 4. 为参会人录入 10 秒左右声纹样本；
 5. 输入客户名称和会晤目标并点击“新建会议”；

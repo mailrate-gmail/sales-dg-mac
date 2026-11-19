@@ -33,6 +33,9 @@ class RuntimeConfigService:
             silence_duration_ms=settings.silence_duration_ms,
             min_speech_duration_ms=settings.min_speech_duration_ms,
             punctuation_sensitivity=settings.punctuation_sensitivity,
+            punctuation_provider=settings.punctuation_provider,  # type: ignore[arg-type]
+            punctuation_model=settings.punctuation_model,
+            punctuation_device=settings.punctuation_device,
         )
 
     def get(self) -> ModelConfig:
