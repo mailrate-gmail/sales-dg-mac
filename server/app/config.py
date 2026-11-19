@@ -25,7 +25,6 @@ class Settings(BaseSettings):
     energy_threshold: float = 0.008
     silence_duration_ms: int = 800
     min_speech_duration_ms: int = 1000
-    punctuation_sensitivity: float = 0.6
     punctuation_provider: str = "funasr_punc"
     punctuation_model: str = "ct-punc"
     punctuation_device: str = "cpu"

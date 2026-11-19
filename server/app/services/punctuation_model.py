@@ -83,10 +83,10 @@ def restore_final_punctuation(text: str) -> str:
         return raw_text
 
     if config.punctuation_provider == "rule":
-        return restore_punctuation(raw_text, sensitivity=config.punctuation_sensitivity)
+        return restore_punctuation(raw_text)
 
     try:
         return get_punctuation_model().restore(raw_text)
     except Exception as exc:
         logger.warning("FunASR 标点模型不可用，降级到规则标点：%s", exc)
-        return restore_punctuation(raw_text, sensitivity=config.punctuation_sensitivity)
+        return restore_punctuation(raw_text)

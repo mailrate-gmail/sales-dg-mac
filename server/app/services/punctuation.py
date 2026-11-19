@@ -5,7 +5,7 @@ FunASR streaming 与部分短音频 ASR 输出常缺少标点。本模块不依�
 
 - 已有句末标点则不重复追加；
 - 按常见中文连接词补少量逗号；
-- 按“标点敏感度”拆分过长分句；
+- 对超长无标点分句做固定保守切分；
 - 根据疑问词补问号，否则补句号。
 
 这不是完整的语义标点模型，但能显著改善实时会话区“整段无标点”的可读性，
@@ -81,25 +81,7 @@ SPLIT_CANDIDATES = [
     "的时候",
     "之后",
 ]
-
-
-def clamp_sensitivity(value: float | int | None) -> float:
-    if value is None:
-        return 0.6
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return 0.6
-    return max(0.0, min(1.0, number))
-
-
-def max_clause_length(sensitivity: float) -> int:
-    """敏感度越高，允许的无标点分句越短。"""
-    sensitivity = clamp_sensitivity(sensitivity)
-    if sensitivity <= 0.05:
-        return 9999
-    # 0.1 -> 44 左右；0.6 -> 28 左右；1.0 -> 16。
-    return int(round(48 - sensitivity * 32))
+MAX_PLAIN_CLAUSE_LENGTH = 42
 
 
 def normalize_spaces(text: str) -> str:
@@ -124,7 +106,7 @@ def ensure_sentence_end(text: str) -> str:
     return text + ("？" if is_question_like(text) else "。")
 
 
-def insert_commas(text: str, sensitivity: float = 0.6) -> str:
+def insert_commas(text: str) -> str:
     """按连接词补少量中文逗号。
 
     只在连接词不是句首且前一个字符不是标点时插入，避免破坏已有标点。
@@ -133,13 +115,7 @@ def insert_commas(text: str, sensitivity: float = 0.6) -> str:
         return text
 
     result = text
-    sensitivity = clamp_sensitivity(sensitivity)
-    active_markers = COMMA_MARKERS
-    if sensitivity < 0.35:
-        # 低敏感度：只对最明显的转折/顺承词补逗号。
-        active_markers = ["但是", "不过", "所以", "因此", "然后"]
-
-    for marker in active_markers:
+    for marker in COMMA_MARKERS:
         # (?<![标点]) 表示 marker 前一个字符不是标点；(.+) 保证不是句首。
         result = re.sub(
             rf"(?<![{re.escape(ANY_PUNCTUATION)}])({re.escape(marker)})",
@@ -173,11 +149,8 @@ def split_long_plain_clause(clause: str, limit: int) -> str:
     return "，".join(part for part in parts if part)
 
 
-def split_long_clauses(text: str, sensitivity: float = 0.6) -> str:
-    limit = max_clause_length(sensitivity)
-    if limit > 1000:
-        return text
-
+def split_long_clauses(text: str) -> str:
+    limit = MAX_PLAIN_CLAUSE_LENGTH
     result: list[str] = []
     current: list[str] = []
     for char in text:
@@ -193,20 +166,13 @@ def split_long_clauses(text: str, sensitivity: float = 0.6) -> str:
     return "".join(result)
 
 
-def restore_punctuation(text: str, sensitivity: float = 0.6) -> str:
-    """给 ASR final 文本补充基础中文标点。
-
-    `sensitivity` 范围 0~1：
-    - 0：极保守，基本只补句末标点；
-    - 0.6：默认，连接词补逗号，较长分句补逗号；
-    - 1：更激进，更短分句也会补逗号。
-    """
+def restore_punctuation(text: str) -> str:
+    """给 ASR final 文本补充基础中文标点，使用固定保守规则。"""
     text = normalize_spaces(text)
     if not text:
         return ""
 
-    sensitivity = clamp_sensitivity(sensitivity)
-    if sensitivity > 0.05 and (not has_punctuation(text) or sensitivity >= 0.75):
-        text = insert_commas(text, sensitivity)
-    text = split_long_clauses(text, sensitivity)
+    if not has_punctuation(text):
+        text = insert_commas(text)
+    text = split_long_clauses(text)
     return ensure_sentence_end(text)

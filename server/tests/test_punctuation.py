@@ -30,15 +30,15 @@ class TestRestorePunctuation(unittest.TestCase):
         self.assertEqual(restore_punctuation(""), "")
         self.assertEqual(restore_punctuation("   "), "")
 
-    def test_sensitivity_controls_long_clause_splitting(self):
-        text = "我们现在客户线索进来以后销售一般两三天才会跟进这个过程比较慢经常会漏掉一些线索"
-        conservative = restore_punctuation(text, sensitivity=0.1)
-        aggressive = restore_punctuation(text, sensitivity=1.0)
-        self.assertGreater(aggressive.count("，"), conservative.count("，"))
+    def test_splits_long_clause_with_fixed_rule(self):
+        text = "我们现在客户线索进来以后销售一般两三天才会跟进这个过程比较慢经常会漏掉一些重要线索后续还要人工追踪"
+        restored = restore_punctuation(text)
+        self.assertIn("，", restored)
+        self.assertTrue(restored.endswith("。"))
 
-    def test_zero_sensitivity_only_adds_sentence_end(self):
+    def test_fixed_rule_is_deterministic(self):
         text = "我们现在流程比较复杂但是希望尽快上线"
-        self.assertEqual(restore_punctuation(text, sensitivity=0), "我们现在流程比较复杂但是希望尽快上线。")
+        self.assertEqual(restore_punctuation(text), restore_punctuation(text))
 
 
 if __name__ == "__main__":

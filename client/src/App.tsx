@@ -8,6 +8,7 @@ const ANY_PUNCTUATION = '，,。.!！?？；;：:、'
 const QUESTION_MARKERS = ['吗', '呢', '么', '什么', '为什么', '怎么', '如何', '是否', '能否', '能不能', '可不可以', '有没有', '多少', '什么时候', '请问']
 const COMMA_MARKERS = ['但是', '不过', '所以', '因此', '然后', '另外', '同时', '而且', '如果', '其实', '比如', '例如', '也就是说', '一方面', '另一方面', '首先', '其次', '最后']
 const SPLIT_CANDIDATES = ['因为', '所以', '但是', '然后', '另外', '同时', '如果', '我们', '客户', '现在', '目前', '这个', '那个', '可以', '需要', '希望', '已经', '就是', '的话', '的时候', '之后']
+const MAX_PLAIN_CLAUSE_LENGTH = 42
 
 function escapeRegExp(text: string) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -19,17 +20,6 @@ function hasAnyPunctuation(text: string) {
 
 function isQuestionLike(text: string) {
   return text.includes('?') || text.includes('？') || QUESTION_MARKERS.some((marker) => text.includes(marker))
-}
-
-function clampPunctuationSensitivity(value: number | undefined | null) {
-  if (typeof value !== 'number' || Number.isNaN(value)) return 0.6
-  return Math.max(0, Math.min(1, value))
-}
-
-function maxClauseLength(sensitivity: number) {
-  const value = clampPunctuationSensitivity(sensitivity)
-  if (value <= 0.05) return 9999
-  return Math.round(48 - value * 32)
 }
 
 function splitLongPlainClause(text: string, limit: number) {
@@ -55,9 +45,8 @@ function splitLongPlainClause(text: string, limit: number) {
   return parts.join('，')
 }
 
-function splitLongClauses(text: string, sensitivity: number) {
-  const limit = maxClauseLength(sensitivity)
-  if (limit > 1000) return text
+function splitLongClauses(text: string) {
+  const limit = MAX_PLAIN_CLAUSE_LENGTH
   let result = ''
   let current = ''
   for (const char of Array.from(text)) {
@@ -75,20 +64,18 @@ function splitLongClauses(text: string, sensitivity: number) {
   return result
 }
 
-function displayTranscriptText(text: string, sensitivity = 0.6) {
+function displayTranscriptText(text: string) {
   let value = text.replace(/\s+/g, ' ').trim()
   if (!value) return ''
 
-  const punctuationSensitivity = clampPunctuationSensitivity(sensitivity)
-  if (punctuationSensitivity > 0.05 && (!hasAnyPunctuation(value) || punctuationSensitivity >= 0.75)) {
-    const activeMarkers = punctuationSensitivity < 0.35 ? ['但是', '不过', '所以', '因此', '然后'] : COMMA_MARKERS
-    for (const marker of activeMarkers) {
+  if (!hasAnyPunctuation(value)) {
+    for (const marker of COMMA_MARKERS) {
       const pattern = new RegExp(`(?<![${escapeRegExp(ANY_PUNCTUATION)}])(${escapeRegExp(marker)})`, 'g')
       value = value.replace(pattern, '，$1')
     }
     value = value.replace(/^，+/, '')
   }
-  value = splitLongClauses(value, punctuationSensitivity)
+  value = splitLongClauses(value)
 
   const last = value[value.length - 1]
   if (!SENTENCE_END.includes(last)) {
@@ -174,7 +161,6 @@ interface ModelConfig {
   energy_threshold: number
   silence_duration_ms: number
   min_speech_duration_ms: number
-  punctuation_sensitivity: number
   punctuation_provider: 'asr' | 'funasr_punc' | 'rule' | 'off'
   punctuation_model: string
   punctuation_device: string
@@ -270,7 +256,6 @@ const defaultConfig: ModelConfig = {
   energy_threshold: 0.008,
   silence_duration_ms: 800,
   min_speech_duration_ms: 1000,
-  punctuation_sensitivity: 0.6,
   punctuation_provider: 'funasr_punc',
   punctuation_model: 'ct-punc',
   punctuation_device: 'cpu',
@@ -663,7 +648,7 @@ export function App() {
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data)
       if (data.type === 'partial') {
-        setRecordingStatus(`实时字幕：${displayTranscriptText(data.text, configRef.current.punctuation_sensitivity)}`)
+        setRecordingStatus(`实时字幕：${displayTranscriptText(data.text)}`)
       } else if (data.type === 'final') {
         const message: Message = data.message
         setMessages((items) => [...items, message])
@@ -1062,22 +1047,6 @@ export function App() {
     setConfig((current) => ({ ...current, [key]: value }))
   }
 
-  async function updatePunctuationSensitivity(value: number) {
-    const nextValue = clampPunctuationSensitivity(value)
-    const nextConfig = ensureCurrentModelVisible({ ...config, punctuation_sensitivity: nextValue })
-    setConfig(nextConfig)
-    const res = await fetch(`${API_BASE}/api/config`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(nextConfig),
-    })
-    if (res.ok) {
-      setConfig(await res.json())
-    } else {
-      setRecordingStatus('标点敏感度保存失败，请稍后重试')
-    }
-  }
-
   return (
     <div className={menuCollapsed ? 'app-shell menu-collapsed' : 'app-shell'}>
       <aside className="sidebar">
@@ -1361,17 +1330,6 @@ export function App() {
               <h2>实时会话</h2>
               <div className="section-actions">
                 <span>当前能量：{energyLevel.toFixed(4)} / 触发阈值：{Math.min(config.energy_threshold || VOICE_ENERGY_TRIGGER, VOICE_ENERGY_TRIGGER)} / 停顿 {VOICE_GAP_SPLIT_MS / 1000}s 切分</span>
-                <label className="inline-range" title="数值越高，越积极地为长句添加逗号/句号；调整后立即生效">
-                  实时字幕规则标点敏感度 {Math.round(clampPunctuationSensitivity(config.punctuation_sensitivity) * 100)}%
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.1"
-                    value={clampPunctuationSensitivity(config.punctuation_sensitivity)}
-                    onChange={(e) => void updatePunctuationSensitivity(Number(e.target.value))}
-                  />
-                </label>
                 <button className="secondary-action" onClick={clearRealtimeConversation}>清空</button>
               </div>
             </div>
