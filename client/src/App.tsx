@@ -1361,12 +1361,12 @@ export function App() {
       <section className="page-card">
         <div className="page-title">
           <h1>本地语音与识别参数</h1>
-          <p>配置 Whisper fallback、声纹匹配、cam++ 说话人分离和浏览器能量切分。</p>
+          <p>配置 faster-whisper 短音频 fallback、声纹匹配、cam++ 说话人分离和浏览器能量切分。实时识别主链路使用 FunASR streaming。</p>
         </div>
         <div className="config-grid">
-          <label>Whisper Model<input value={config.whisper_model} onChange={(e) => updateConfig('whisper_model', e.target.value)} /></label>
-          <label>Whisper Device<input value={config.whisper_device} onChange={(e) => updateConfig('whisper_device', e.target.value)} /></label>
-          <label>Whisper Compute Type<input value={config.whisper_compute_type} onChange={(e) => updateConfig('whisper_compute_type', e.target.value)} /></label>
+          <label>faster-whisper fallback 模型<input value={config.whisper_model} onChange={(e) => updateConfig('whisper_model', e.target.value)} /></label>
+          <label>faster-whisper fallback 设备<input value={config.whisper_device} onChange={(e) => updateConfig('whisper_device', e.target.value)} /></label>
+          <label>faster-whisper fallback Compute Type<input value={config.whisper_compute_type} onChange={(e) => updateConfig('whisper_compute_type', e.target.value)} /></label>
           <label>已知参会人匹配阈值<input type="number" step="0.01" min="0" max="1" value={config.speaker_threshold} onChange={(e) => updateConfig('speaker_threshold', Number(e.target.value))} /></label>
           <label>未知说话人聚类阈值<input type="number" step="0.01" min="0" max="1" value={config.speaker_cluster_threshold} onChange={(e) => updateConfig('speaker_cluster_threshold', Number(e.target.value))} /></label>
           <label>cam++ 说话人分离
