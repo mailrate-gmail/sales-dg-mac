@@ -1238,7 +1238,9 @@ export function App() {
               )
             })}
           </div>
+        </section>
 
+        <section className="page-card">
           <div className="model-section-title">
             <h2>当前 LLM 连接</h2>
             <span>展示当前会被会议助手用于 AI 回复、总结和连接测试的 LLM。</span>
@@ -1275,7 +1277,9 @@ export function App() {
             </button>
           </div>
           {connectionTest && <div className="connection-result">{connectionTest}</div>}
+        </section>
 
+        <section className="page-card">
           <div className="model-section-title">
             <h2>LLM 连接配置</h2>
             <span>修改 Provider、模型、Base URL、接口类型和 API Key；保存后会同步到“当前 LLM 连接”和“模型可用性”。</span>
@@ -1298,7 +1302,9 @@ export function App() {
           <div className="model-actions">
             <button onClick={saveConfig}>保存模型配置</button>
           </div>
+        </section>
 
+        <section className="page-card">
           <div className="model-section-title">
             <h2>ASR Provider 配置</h2>
             <span>选择语音识别后端。会议室实时流式识别固定使用 FunASR；此项控制短音频上传（fallback）使用的引擎：FunASR 本地流式模型整段识别，或 faster-whisper 本地短音频识别。OCI Speech 尚未接入，选中后短音频上传会明确报错。</span>
@@ -1330,7 +1336,9 @@ export function App() {
             <label>OCI Config File<input value={config.oci_speech_config_file} onChange={(e) => updateConfig('oci_speech_config_file', e.target.value)} /></label>
             <label>OCI Realtime Endpoint<input placeholder="wss://realtime.aiservice.<region>.oci.oraclecloud.com/..." value={config.oci_speech_realtime_endpoint} onChange={(e) => updateConfig('oci_speech_realtime_endpoint', e.target.value)} /></label>
           </div>
+        </section>
 
+        <section className="page-card">
           <div className="model-section-title">
             <h2>本地语音与识别参数</h2>
             <span>控制 Whisper、声纹匹配、可选 cam++ 说话人分离和浏览器能量切分。</span>
