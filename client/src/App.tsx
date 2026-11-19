@@ -1133,7 +1133,7 @@ export function App() {
           <div className={page === 'modelSettings' || page === 'asrSettings' || page === 'voiceSettings' || page === 'themeSettings' ? 'menu-group active' : 'menu-group'}>
             <div className="menu-parent" title="系统配置"><span>⚙</span><b>系统配置</b></div>
             <div className="submenu">
-              <button title="模型配置" className={page === 'modelSettings' ? 'active' : ''} onClick={() => navigateTo('modelSettings')}><span>◦</span><b>模型配置</b></button>
+              <button title="LLM模型配置" className={page === 'modelSettings' ? 'active' : ''} onClick={() => navigateTo('modelSettings')}><span>◦</span><b>LLM模型配置</b></button>
               <button title="ASR 配置" className={page === 'asrSettings' ? 'active' : ''} onClick={() => navigateTo('asrSettings')}><span>◦</span><b>ASR 配置</b></button>
               <button title="语音识别参数" className={page === 'voiceSettings' ? 'active' : ''} onClick={() => navigateTo('voiceSettings')}><span>◦</span><b>语音识别参数</b></button>
               <button title="主题风格" className={page === 'themeSettings' ? 'active' : ''} onClick={() => navigateTo('themeSettings')}><span>◦</span><b>主题风格</b></button>
@@ -1208,8 +1208,8 @@ export function App() {
       <div className="settings-stack">
         <section className="page-card">
           <div className="page-title">
-            <h1>模型配置</h1>
-            <p>管理 Grok、Qwen、GPT 等模型可用性，测试连接，并配置当前会议助手使用的模型。</p>
+            <h1>LLM模型配置</h1>
+            <p>管理 Grok、Qwen、GPT 等 LLM 模型可用性，测试连接，并配置当前会议助手使用的大模型。</p>
           </div>
 
           <div className="model-section-title">
@@ -1308,7 +1308,7 @@ export function App() {
           </div>
 
           <div className="model-actions">
-            <button onClick={saveConfig}>保存模型配置</button>
+            <button onClick={saveConfig}>保存 LLM 模型配置</button>
           </div>
         </section>
       </div>
