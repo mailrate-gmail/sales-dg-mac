@@ -499,7 +499,32 @@ async def process_audio_file(session_id: str, file: UploadFile) -> list[Message]
     return new_messages
 
 
-def bind_speaker_identity(session_id: str, speaker_identity_id: str, payload: SpeakerBindRequest) -> SpeakerBindResponse:
+async def backfill_ai_suggestions_for_bound_speaker(session: Session, speaker_identity_id: str) -> None:
+    """绑定/修正说话人后，为历史中已满足触发条件的问题补生成 AI 回复。"""
+    changed = False
+    for index, message in enumerate(session.messages):
+        identity = message.speaker_identity_id or message.participant_id or f"voice_{message.id}"
+        if identity != speaker_identity_id:
+            continue
+        if not (message.need_reply and message.should_reply) or message.ai_suggestion:
+            continue
+
+        history = "\n".join([f"{m.speaker_name}: {m.text}" for m in session.messages[max(0, index - 8):index]])
+        data = message.model_dump()
+        data["ai_suggestion"] = await llm_client.suggest_reply(
+            session.goal,
+            history,
+            message.text,
+            structured_context=structured_context_for_session(session),
+        )
+        session.messages[index] = Message(**data)
+        changed = True
+
+    if changed:
+        save_session(session)
+
+
+async def bind_speaker_identity(session_id: str, speaker_identity_id: str, payload: SpeakerBindRequest) -> SpeakerBindResponse:
     session = load_session(session_id)
     updated_count = 0
     for index, message in enumerate(session.messages):
@@ -520,6 +545,8 @@ def bind_speaker_identity(session_id: str, speaker_identity_id: str, payload: Sp
 
     save_session(session)
     context_manager.rebuild(session)
+    if payload.need_reply:
+        await backfill_ai_suggestions_for_bound_speaker(session, speaker_identity_id)
     return SpeakerBindResponse(
         speaker_identity_id=speaker_identity_id,
         speaker_name=payload.speaker_name,
@@ -682,12 +709,12 @@ async def stream_meeting_audio_funasr(websocket: WebSocket, meeting_id: str) -> 
 
 
 @app.put("/api/meetings/{meeting_id}/speakers/{speaker_identity_id}", response_model=SpeakerBindResponse)
-def bind_meeting_speaker(
+async def bind_meeting_speaker(
     meeting_id: str,
     speaker_identity_id: str,
     payload: SpeakerBindRequest,
 ) -> SpeakerBindResponse:
-    return bind_speaker_identity(meeting_id, speaker_identity_id, payload)
+    return await bind_speaker_identity(meeting_id, speaker_identity_id, payload)
 
 
 @app.post("/api/meetings/{meeting_id}/end", response_model=Session)
