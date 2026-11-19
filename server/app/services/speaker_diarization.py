@@ -21,7 +21,7 @@ def _as_float(value: Any, default: float = 0.0) -> float:
     try:
         return float(value)
     except Exception:
-    return default
+        return default
 
 
 def _hf_funasr_model(name: str) -> str:
