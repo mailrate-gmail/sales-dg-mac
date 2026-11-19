@@ -13,7 +13,7 @@
 - 录入参会人声纹样本；
 - 基于浏览器 WebAudio 采集，按语音停顿 0.8s 切分；
 - 本地 FunASR streaming 实时转写（faster-whisper 作为短音频 fallback）；
-- 实时 final 文本默认使用 FunASR 中文标点恢复模型（当前缓存为 ModelScope `ct-punc`）；如切到 Whisper 等自身带标点的后端，也可选择信任 ASR 原始输出；partial 实时字幕最多做保守规则轻补，final 文本不再由前端二次补标点；
+- 实时 final 文本默认使用 HuggingFace `funasr/ct-punc` 中文标点恢复模型；如切到 Whisper 等自身带标点的后端，也可选择信任 ASR 原始输出；partial 实时字幕最多做保守规则轻补，final 文本不再由前端二次补标点；
 - 本地 SpeechBrain 声纹匹配；
 - 手动修正消息说话人；
 - 页面维护 LLM / ASR / 标点 / 声纹阈值 / 能量阈值配置；
@@ -227,8 +227,8 @@ data/
 模型缓存会保存在：
 
 ```text
-model_cache/             # ModelScope 缓存；当前主要保留已下载的 ct-punc 标点模型
-hf_cache/                # HuggingFace 缓存；FunASR streaming、ECAPA、cam++ diarization 新模型源
+model_cache/             # 旧 ModelScope 缓存目录；当前不再作为模型源使用，可保持为空
+hf_cache/                # HuggingFace 缓存；FunASR streaming、ct-punc、ECAPA、cam++ diarization
 ```
 
 这些目录用于避免容器重建后重复下载 ASR 模型，已加入 `.gitignore`。
@@ -238,11 +238,11 @@ hf_cache/                # HuggingFace 缓存；FunASR streaming、ECAPA、cam++
 | 功能 | 模型 | 来源 |
 | --- | --- | --- |
 | 实时 ASR | `funasr/paraformer-zh-streaming` | HuggingFace |
-| final 标点 | `ct-punc` | 当前仍使用已缓存的 ModelScope 模型 |
+| final 标点 | `funasr/ct-punc` | HuggingFace |
 | 声纹匹配/聚类 | `speechbrain/spkrec-ecapa-voxceleb` | HuggingFace |
 | 可选 cam++ diarization | `funasr/paraformer-zh` + `funasr/fsmn-vad` + `funasr/campplus` | HuggingFace |
 
-> 计划：后续将 `ct-punc` 标点恢复也切换到 HuggingFace `funasr/ct-punc`，届时可清理剩余 ModelScope 缓存，实现模型源统一。
+> 当前 active 模型源已统一为 HuggingFace；历史 ModelScope 缓存可清理，`model_cache/` 仅作为兼容保留目录。
 
 ## 6. 说话人识别调参
 

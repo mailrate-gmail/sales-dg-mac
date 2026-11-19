@@ -19,7 +19,7 @@ def get_streaming_model() -> Any:
     try:
         from funasr import AutoModel
     except ImportError as exc:
-        raise RuntimeError("FunASR 未安装，请安装 funasr 和 modelscope 依赖。") from exc
+        raise RuntimeError("FunASR 未安装，请安装 funasr 依赖。") from exc
 
     config = runtime_config.get()
     model_name = config.funasr_model or "paraformer-zh-streaming"
@@ -31,6 +31,7 @@ def get_streaming_model() -> Any:
     return AutoModel(
         model=model_name,
         hub="hf",
+        model_revision="main",
         device=config.funasr_device,
         disable_update=True,
     )

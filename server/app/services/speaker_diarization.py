@@ -24,8 +24,8 @@ def _as_float(value: Any, default: float = 0.0) -> float:
         return default
 
 
-def _hf_funasr_model(name: str) -> str:
-    return name if "/" in name else f"funasr/{name}"
+def _funasr_hf_punctuation_alias(name: str) -> str:
+    return "ct-punc" if name == "funasr/ct-punc" else name
 
 
 def _extract_sentence_info(result: Any) -> list[dict[str, Any]]:
@@ -45,17 +45,18 @@ class FunASRSpeakerDiarizationModel:
         try:
             from funasr import AutoModel
         except ImportError as exc:
-            raise RuntimeError("FunASR 未安装，请安装 funasr 和 modelscope 依赖。") from exc
+            raise RuntimeError("FunASR 未安装，请安装 funasr 依赖。") from exc
 
         config = runtime_config.get()
         # paraformer-zh + fsmn-vad + ct-punc + campplus 是 FunASR 官方常用的 ASR+VAD+标点+说话人组合。
-        # 使用 HuggingFace 的显式模型路径，避免 ModelScope 在部分网络环境下大文件下载/合并失败。
+        # 使用 hub='hf' 强制从 HuggingFace 解析，避免 ModelScope 在部分网络环境下大文件下载/合并失败。
         self.model = AutoModel(
-            model="funasr/paraformer-zh",
-            vad_model="funasr/fsmn-vad",
-            punc_model=_hf_funasr_model(config.punctuation_model or "ct-punc"),
-            spk_model="funasr/campplus",
+            model="paraformer-zh",
+            vad_model="fsmn-vad",
+            punc_model=_funasr_hf_punctuation_alias(config.punctuation_model or "ct-punc"),
+            spk_model="cam++",
             hub="hf",
+            model_revision="main",
             device=config.funasr_device,
             disable_update=True,
         )

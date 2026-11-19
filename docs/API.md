@@ -552,7 +552,7 @@ curl -X POST \
 
 > **ASR 后端选择**：`asr_provider` 控制短音频上传接口（`POST /api/meetings/{id}/audio` 与 `POST /api/audio/process`）使用的引擎：`funasr_streaming`（默认）用本地 FunASR 流式模型整段识别；`faster_whisper` 用本地 faster-whisper 识别并返回带时间戳分段；`oci_speech` 尚未接入，返回 `501`。会议室实时流式 WebSocket 识别固定使用 FunASR，不受该字段影响。
 
-> **标点 Provider**：`punctuation_provider` 支持 `funasr_punc` / `asr` / `rule` / `off`。实时 FunASR streaming 的原始 final 通常没有标点，因此默认使用 `funasr_punc`（`ct-punc`）为 final 文本补标点；前端不再对 final 文本二次补标点。当前独立 final 标点服务仍使用已缓存的 ModelScope `ct-punc`；后续计划切换为 HuggingFace `funasr/ct-punc` 以统一模型源。`rule` 仅作为固定保守规则 fallback，不再提供敏感度参数。
+> **标点 Provider**：`punctuation_provider` 支持 `funasr_punc` / `asr` / `rule` / `off`。实时 FunASR streaming 的原始 final 通常没有标点，因此默认使用 `funasr_punc`（HuggingFace `funasr/ct-punc`）为 final 文本补标点；前端不再对 final 文本二次补标点。`rule` 仅作为固定保守规则 fallback，不再提供敏感度参数。
 
 > **说话人阈值**：`speaker_threshold` 用于匹配已录入声纹的参会人；`speaker_cluster_threshold` 用于将未知说话人的多段语音合并成同一个 `voice_xxx`。同一个人被拆成多个 ID 时可降低 `speaker_cluster_threshold`（如 `0.40` / `0.35`）；不同人被合并时可调高。`speaker_diarization_enabled` 控制可选 FunASR `cam++` / `campplus` 说话人分离，默认关闭；该链路已改用 HuggingFace 模型源（`funasr/paraformer-zh`、`funasr/fsmn-vad`、`funasr/campplus`），首次触发时会惰性下载。
 

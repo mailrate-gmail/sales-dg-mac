@@ -1,4 +1,4 @@
-"""FunASR / ModelScope 中文标点恢复模型。
+"""FunASR / HuggingFace 中文标点恢复模型。
 
 模型只在 final 文本处理时惰性加载；partial 文本继续由前端规则轻补，避免实时字幕延迟。
 """
@@ -33,19 +33,32 @@ def _extract_text(result: Any) -> str:
         return ""
 
 
+def _funasr_hf_punctuation_alias(name: str) -> str:
+    """Return a FunASR registry alias that resolves to HuggingFace when hub='hf'.
+
+    FunASR 1.2.x maps the alias ``ct-punc`` to the HuggingFace repository
+    ``funasr/ct-punc`` internally. Passing the repository id directly can fail
+    registration before the model is cached, so keep the registered alias while
+    forcing the hub to HuggingFace.
+    """
+    return "ct-punc" if name == "funasr/ct-punc" else name
+
+
 class FunASRPunctuationModel:
     def __init__(self) -> None:
         try:
             from funasr import AutoModel
         except ImportError as exc:
-            raise RuntimeError("FunASR 未安装，请安装 funasr 和 modelscope 依赖。") from exc
+            raise RuntimeError("FunASR 未安装，请安装 funasr 依赖。") from exc
 
         config = runtime_config.get()
-        model_name = config.punctuation_model or "ct-punc"
+        model_name = _funasr_hf_punctuation_alias(config.punctuation_model or "ct-punc")
 
-        # ct-punc 是 FunASR 内置的标点恢复模型别名，交给 AutoModel / ModelScope 解析。
+        # 使用 hub='hf' 强制从 HuggingFace 解析；ct-punc 会映射到 funasr/ct-punc。
         self.model = AutoModel(
             model=model_name,
+            hub="hf",
+            model_revision="main",
             device=config.punctuation_device,
             disable_update=True,
         )
