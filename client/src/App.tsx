@@ -85,7 +85,7 @@ function displayTranscriptText(text: string) {
 }
 
 type Role = 'self' | 'customer' | 'other' | 'unknown'
-type Page = 'new' | 'history' | 'modelSettings' | 'themeSettings' | 'room'
+type Page = 'new' | 'history' | 'modelSettings' | 'asrSettings' | 'voiceSettings' | 'themeSettings' | 'room'
 type Theme = 'dark' | 'light' | 'blue'
 
 interface AppRoute {
@@ -97,6 +97,8 @@ function routeFromHash(hash = window.location.hash): AppRoute {
   const value = hash.replace(/^#/, '') || '/new'
   if (value === '/history') return { page: 'history' }
   if (value === '/settings/model') return { page: 'modelSettings' }
+  if (value === '/settings/asr') return { page: 'asrSettings' }
+  if (value === '/settings/voice') return { page: 'voiceSettings' }
   if (value === '/settings/theme') return { page: 'themeSettings' }
   if (value === '/room') return { page: 'room' }
   const meetingMatch = value.match(/^\/meetings\/([^/]+)$/)
@@ -107,6 +109,8 @@ function routeFromHash(hash = window.location.hash): AppRoute {
 function hashForRoute(page: Page, meetingId?: string) {
   if (page === 'history') return '#/history'
   if (page === 'modelSettings') return '#/settings/model'
+  if (page === 'asrSettings') return '#/settings/asr'
+  if (page === 'voiceSettings') return '#/settings/voice'
   if (page === 'themeSettings') return '#/settings/theme'
   if (page === 'room') return meetingId ? `#/meetings/${encodeURIComponent(meetingId)}` : '#/room'
   return '#/new'
@@ -1126,10 +1130,12 @@ export function App() {
         <nav className="main-menu">
           <button title="新建会议" className={page === 'new' ? 'active' : ''} onClick={() => navigateTo('new')}><span>＋</span><b>新建会议</b></button>
           <button title="历史会议" className={page === 'history' ? 'active' : ''} onClick={() => navigateTo('history')}><span>↺</span><b>历史会议</b></button>
-          <div className={page === 'modelSettings' || page === 'themeSettings' ? 'menu-group active' : 'menu-group'}>
+          <div className={page === 'modelSettings' || page === 'asrSettings' || page === 'voiceSettings' || page === 'themeSettings' ? 'menu-group active' : 'menu-group'}>
             <div className="menu-parent" title="系统配置"><span>⚙</span><b>系统配置</b></div>
             <div className="submenu">
               <button title="模型配置" className={page === 'modelSettings' ? 'active' : ''} onClick={() => navigateTo('modelSettings')}><span>◦</span><b>模型配置</b></button>
+              <button title="ASR 配置" className={page === 'asrSettings' ? 'active' : ''} onClick={() => navigateTo('asrSettings')}><span>◦</span><b>ASR 配置</b></button>
+              <button title="语音识别参数" className={page === 'voiceSettings' ? 'active' : ''} onClick={() => navigateTo('voiceSettings')}><span>◦</span><b>语音识别参数</b></button>
               <button title="主题风格" className={page === 'themeSettings' ? 'active' : ''} onClick={() => navigateTo('themeSettings')}><span>◦</span><b>主题风格</b></button>
             </div>
           </div>
@@ -1145,6 +1151,8 @@ export function App() {
         {page === 'new' && renderNewMeeting()}
         {page === 'history' && renderHistory()}
         {page === 'modelSettings' && renderModelSettings()}
+        {page === 'asrSettings' && renderAsrSettings()}
+        {page === 'voiceSettings' && renderVoiceSettings()}
         {page === 'themeSettings' && renderThemeSettings()}
         {page === 'room' && renderMeetingRoom()}
       </main>
@@ -1303,64 +1311,78 @@ export function App() {
             <button onClick={saveConfig}>保存模型配置</button>
           </div>
         </section>
-
-        <section className="page-card">
-          <div className="model-section-title">
-            <h2>ASR Provider 配置</h2>
-            <span>选择语音识别后端。会议室实时流式识别固定使用 FunASR；此项控制短音频上传（fallback）使用的引擎：FunASR 本地流式模型整段识别，或 faster-whisper 本地短音频识别。OCI Speech 尚未接入，选中后短音频上传会明确报错。</span>
-          </div>
-          <div className="config-grid">
-            <label>ASR Provider
-              <select value={config.asr_provider} onChange={(e) => updateConfig('asr_provider', e.target.value as ModelConfig['asr_provider'])}>
-                <option value="funasr_streaming">FunASR Streaming（本地流式）</option>
-                <option value="faster_whisper">faster-whisper（本地短音频）</option>
-                <option value="oci_speech">OCI Speech（云端实时，待接入）</option>
-              </select>
-            </label>
-            <label>FunASR Model<input value={config.funasr_model} onChange={(e) => updateConfig('funasr_model', e.target.value)} /></label>
-            <label>FunASR Device<input value={config.funasr_device} onChange={(e) => updateConfig('funasr_device', e.target.value)} /></label>
-            <label>标点 Provider
-              <select value={config.punctuation_provider} onChange={(e) => updateConfig('punctuation_provider', e.target.value as ModelConfig['punctuation_provider'])}>
-                <option value="funasr_punc">FunASR / ModelScope 标点模型（实时 final 推荐）</option>
-                <option value="asr">ASR / Whisper 原始标点（FunASR streaming 通常无标点）</option>
-                <option value="rule">规则标点</option>
-                <option value="off">关闭标点恢复</option>
-              </select>
-            </label>
-            <label>标点模型<input value={config.punctuation_model} onChange={(e) => updateConfig('punctuation_model', e.target.value)} /></label>
-            <label>标点设备<input value={config.punctuation_device} onChange={(e) => updateConfig('punctuation_device', e.target.value)} /></label>
-            <label>OCI Region<input placeholder="us-ashburn-1" value={config.oci_speech_region} onChange={(e) => updateConfig('oci_speech_region', e.target.value)} /></label>
-            <label>OCI Compartment OCID<input value={config.oci_speech_compartment_id} onChange={(e) => updateConfig('oci_speech_compartment_id', e.target.value)} /></label>
-            <label>OCI Language<input value={config.oci_speech_language} onChange={(e) => updateConfig('oci_speech_language', e.target.value)} /></label>
-            <label>OCI Profile<input value={config.oci_speech_profile} onChange={(e) => updateConfig('oci_speech_profile', e.target.value)} /></label>
-            <label>OCI Config File<input value={config.oci_speech_config_file} onChange={(e) => updateConfig('oci_speech_config_file', e.target.value)} /></label>
-            <label>OCI Realtime Endpoint<input placeholder="wss://realtime.aiservice.<region>.oci.oraclecloud.com/..." value={config.oci_speech_realtime_endpoint} onChange={(e) => updateConfig('oci_speech_realtime_endpoint', e.target.value)} /></label>
-          </div>
-        </section>
-
-        <section className="page-card">
-          <div className="model-section-title">
-            <h2>本地语音与识别参数</h2>
-            <span>控制 Whisper、声纹匹配、可选 cam++ 说话人分离和浏览器能量切分。</span>
-          </div>
-          <div className="config-grid">
-            <label>Whisper Model<input value={config.whisper_model} onChange={(e) => updateConfig('whisper_model', e.target.value)} /></label>
-            <label>Whisper Device<input value={config.whisper_device} onChange={(e) => updateConfig('whisper_device', e.target.value)} /></label>
-            <label>Whisper Compute Type<input value={config.whisper_compute_type} onChange={(e) => updateConfig('whisper_compute_type', e.target.value)} /></label>
-            <label>已知参会人匹配阈值<input type="number" step="0.01" min="0" max="1" value={config.speaker_threshold} onChange={(e) => updateConfig('speaker_threshold', Number(e.target.value))} /></label>
-            <label>未知说话人聚类阈值<input type="number" step="0.01" min="0" max="1" value={config.speaker_cluster_threshold} onChange={(e) => updateConfig('speaker_cluster_threshold', Number(e.target.value))} /></label>
-            <label>cam++ 说话人分离
-              <select value={config.speaker_diarization_enabled ? 'on' : 'off'} onChange={(e) => updateConfig('speaker_diarization_enabled', e.target.value === 'on')}>
-                <option value="off">关闭（推荐，本地轻量）</option>
-                <option value="on">开启（需要 Colima 约 12GB 内存）</option>
-              </select>
-            </label>
-            <label>能量阈值<input type="number" step="0.001" value={config.energy_threshold} onChange={(e) => updateConfig('energy_threshold', Number(e.target.value))} /></label>
-            <label>语音间断切分 ms<input type="number" value={VOICE_GAP_SPLIT_MS} disabled readOnly /></label>
-            <label>最短语音 ms<input type="number" value={config.min_speech_duration_ms} onChange={(e) => updateConfig('min_speech_duration_ms', Number(e.target.value))} /></label>
-          </div>
-        </section>
       </div>
+    )
+  }
+
+  function renderAsrSettings() {
+    return (
+      <section className="page-card">
+        <div className="page-title">
+          <h1>ASR Provider 配置</h1>
+          <p>配置语音识别后端、FunASR 模型、标点恢复和 OCI Speech 参数。</p>
+        </div>
+        <div className="config-grid">
+          <label>ASR Provider
+            <select value={config.asr_provider} onChange={(e) => updateConfig('asr_provider', e.target.value as ModelConfig['asr_provider'])}>
+              <option value="funasr_streaming">FunASR Streaming（本地流式）</option>
+              <option value="faster_whisper">faster-whisper（本地短音频）</option>
+              <option value="oci_speech">OCI Speech（云端实时，待接入）</option>
+            </select>
+          </label>
+          <label>FunASR Model<input value={config.funasr_model} onChange={(e) => updateConfig('funasr_model', e.target.value)} /></label>
+          <label>FunASR Device<input value={config.funasr_device} onChange={(e) => updateConfig('funasr_device', e.target.value)} /></label>
+          <label>标点 Provider
+            <select value={config.punctuation_provider} onChange={(e) => updateConfig('punctuation_provider', e.target.value as ModelConfig['punctuation_provider'])}>
+              <option value="funasr_punc">FunASR / ModelScope 标点模型（实时 final 推荐）</option>
+              <option value="asr">ASR / Whisper 原始标点（FunASR streaming 通常无标点）</option>
+              <option value="rule">规则标点</option>
+              <option value="off">关闭标点恢复</option>
+            </select>
+          </label>
+          <label>标点模型<input value={config.punctuation_model} onChange={(e) => updateConfig('punctuation_model', e.target.value)} /></label>
+          <label>标点设备<input value={config.punctuation_device} onChange={(e) => updateConfig('punctuation_device', e.target.value)} /></label>
+          <label>OCI Region<input placeholder="us-ashburn-1" value={config.oci_speech_region} onChange={(e) => updateConfig('oci_speech_region', e.target.value)} /></label>
+          <label>OCI Compartment OCID<input value={config.oci_speech_compartment_id} onChange={(e) => updateConfig('oci_speech_compartment_id', e.target.value)} /></label>
+          <label>OCI Language<input value={config.oci_speech_language} onChange={(e) => updateConfig('oci_speech_language', e.target.value)} /></label>
+          <label>OCI Profile<input value={config.oci_speech_profile} onChange={(e) => updateConfig('oci_speech_profile', e.target.value)} /></label>
+          <label>OCI Config File<input value={config.oci_speech_config_file} onChange={(e) => updateConfig('oci_speech_config_file', e.target.value)} /></label>
+          <label>OCI Realtime Endpoint<input placeholder="wss://realtime.aiservice.<region>.oci.oraclecloud.com/..." value={config.oci_speech_realtime_endpoint} onChange={(e) => updateConfig('oci_speech_realtime_endpoint', e.target.value)} /></label>
+        </div>
+        <div className="model-actions">
+          <button onClick={saveConfig}>保存 ASR 配置</button>
+        </div>
+      </section>
+    )
+  }
+
+  function renderVoiceSettings() {
+    return (
+      <section className="page-card">
+        <div className="page-title">
+          <h1>本地语音与识别参数</h1>
+          <p>配置 Whisper fallback、声纹匹配、cam++ 说话人分离和浏览器能量切分。</p>
+        </div>
+        <div className="config-grid">
+          <label>Whisper Model<input value={config.whisper_model} onChange={(e) => updateConfig('whisper_model', e.target.value)} /></label>
+          <label>Whisper Device<input value={config.whisper_device} onChange={(e) => updateConfig('whisper_device', e.target.value)} /></label>
+          <label>Whisper Compute Type<input value={config.whisper_compute_type} onChange={(e) => updateConfig('whisper_compute_type', e.target.value)} /></label>
+          <label>已知参会人匹配阈值<input type="number" step="0.01" min="0" max="1" value={config.speaker_threshold} onChange={(e) => updateConfig('speaker_threshold', Number(e.target.value))} /></label>
+          <label>未知说话人聚类阈值<input type="number" step="0.01" min="0" max="1" value={config.speaker_cluster_threshold} onChange={(e) => updateConfig('speaker_cluster_threshold', Number(e.target.value))} /></label>
+          <label>cam++ 说话人分离
+            <select value={config.speaker_diarization_enabled ? 'on' : 'off'} onChange={(e) => updateConfig('speaker_diarization_enabled', e.target.value === 'on')}>
+              <option value="off">关闭（推荐，本地轻量）</option>
+              <option value="on">开启（需要 Colima 约 12GB 内存）</option>
+            </select>
+          </label>
+          <label>能量阈值<input type="number" step="0.001" value={config.energy_threshold} onChange={(e) => updateConfig('energy_threshold', Number(e.target.value))} /></label>
+          <label>语音间断切分 ms<input type="number" value={VOICE_GAP_SPLIT_MS} disabled readOnly /></label>
+          <label>最短语音 ms<input type="number" value={config.min_speech_duration_ms} onChange={(e) => updateConfig('min_speech_duration_ms', Number(e.target.value))} /></label>
+        </div>
+        <div className="model-actions">
+          <button onClick={saveConfig}>保存语音参数</button>
+        </div>
+      </section>
     )
   }
 
