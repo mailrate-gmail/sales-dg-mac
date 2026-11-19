@@ -69,6 +69,7 @@ def get_punctuation_model() -> FunASRPunctuationModel:
 def restore_final_punctuation(text: str) -> str:
     """按运行时配置恢复 final 文本标点。
 
+    - asr/off：信任 ASR / Whisper / diarization 原始输出，不额外补标点；
     - funasr_punc：优先使用 FunASR 标点模型；模型失败时降级到规则标点；
     - rule：只使用当前规则标点；
     - off：不补标点。
@@ -78,7 +79,7 @@ def restore_final_punctuation(text: str) -> str:
         return ""
 
     config = runtime_config.get()
-    if config.punctuation_provider == "off":
+    if config.punctuation_provider in {"asr", "off"}:
         return raw_text
 
     if config.punctuation_provider == "rule":

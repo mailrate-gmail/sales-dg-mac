@@ -173,7 +173,7 @@ interface ModelConfig {
   silence_duration_ms: number
   min_speech_duration_ms: number
   punctuation_sensitivity: number
-  punctuation_provider: 'funasr_punc' | 'rule' | 'off'
+  punctuation_provider: 'asr' | 'funasr_punc' | 'rule' | 'off'
   punctuation_model: string
   punctuation_device: string
 }
@@ -267,7 +267,7 @@ const defaultConfig: ModelConfig = {
   silence_duration_ms: 800,
   min_speech_duration_ms: 1000,
   punctuation_sensitivity: 0.6,
-  punctuation_provider: 'funasr_punc',
+  punctuation_provider: 'asr',
   punctuation_model: 'ct-punc',
   punctuation_device: 'cpu',
 }
@@ -1243,6 +1243,7 @@ export function App() {
             <label>FunASR Device<input value={config.funasr_device} onChange={(e) => updateConfig('funasr_device', e.target.value)} /></label>
             <label>标点 Provider
               <select value={config.punctuation_provider} onChange={(e) => updateConfig('punctuation_provider', e.target.value as ModelConfig['punctuation_provider'])}>
+                <option value="asr">ASR / Whisper 原始标点（推荐）</option>
                 <option value="funasr_punc">FunASR / ModelScope 标点模型（final）</option>
                 <option value="rule">规则标点</option>
                 <option value="off">关闭标点恢复</option>
@@ -1350,7 +1351,7 @@ export function App() {
               <div className="section-actions">
                 <span>当前能量：{energyLevel.toFixed(4)} / 触发阈值：{Math.min(config.energy_threshold || VOICE_ENERGY_TRIGGER, VOICE_ENERGY_TRIGGER)} / 停顿 {VOICE_GAP_SPLIT_MS / 1000}s 切分</span>
                 <label className="inline-range" title="数值越高，越积极地为长句添加逗号/句号；调整后立即生效">
-                  标点敏感度 {Math.round(clampPunctuationSensitivity(config.punctuation_sensitivity) * 100)}%
+                  实时字幕规则标点敏感度 {Math.round(clampPunctuationSensitivity(config.punctuation_sensitivity) * 100)}%
                   <input
                     type="range"
                     min="0"
@@ -1374,7 +1375,7 @@ export function App() {
                     {typeof message.start_time === 'number' && typeof message.end_time === 'number' && <span className="score">{message.start_time.toFixed(1)}s - {message.end_time.toFixed(1)}s</span>}
                     <span className="score">匹配分：{message.speaker_score?.toFixed(2) ?? '-'}</span>
                   </div>
-                  <p>{displayTranscriptText(message.text, config.punctuation_sensitivity)}</p>
+                  <p>{message.text}</p>
                 </div>
               ))}
             </div>

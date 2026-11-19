@@ -13,12 +13,13 @@
 - 录入参会人声纹样本；
 - 基于浏览器 WebAudio 采集，按语音停顿 0.8s 切分；
 - 本地 FunASR streaming 实时转写（faster-whisper 作为短音频 fallback）；
-- final 文本支持 FunASR / ModelScope 中文标点恢复模型（默认 `ct-punc`），并保留本地轻量规则标点作为 fallback；会议室可实时调整规则标点敏感度；
+- final 文本默认信任 ASR / Whisper / FunASR diarization 输出的原始标点，也可切换到 FunASR / ModelScope 中文标点恢复模型（`ct-punc`）或本地轻量规则标点；会议室的“规则标点敏感度”仅用于实时字幕显示/规则模式；
 - 本地 SpeechBrain 声纹匹配；
 - 手动修正消息说话人；
 - 页面维护 LLM / Whisper / 声纹阈值 / 能量阈值配置；
 - 独立 ASR Provider 配置：FunASR streaming / faster-whisper / OCI Speech；
-- 独立标点 Provider 配置：`funasr_punc` / `rule` / `off`，partial 实时字幕最多做规则轻补，final 文本走配置的标点恢复策略；
+- 独立标点 Provider 配置：`asr` / `funasr_punc` / `rule` / `off`，partial 实时字幕最多做规则轻补，final 文本走配置的标点恢复策略且前端不再二次补标点；
+- 可选 FunASR `cam++` 说话人分离能力可通过 `SPEAKER_DIARIZATION_ENABLED=true` 开启；该模型较大，本地 Docker/Colima 内存不足时建议保持关闭；
 - 本地会话分析（无需本地 LLM）：说明/示例/解释等内容不触发 AI 回复，但进入上下文摘要；
 - 只有「指定参会人 + 本地判定为问题/明确请求」才调用远程 LLM 生成 AI 建议回复；
 - 客户发言白色展示，我方发言黄色展示；
