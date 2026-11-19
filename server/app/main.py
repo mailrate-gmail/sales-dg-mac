@@ -118,6 +118,10 @@ UNKNOWN_SPEAKER_THRESHOLD = 0.55
 # ECAPA 在过短音频上的 embedding 不可靠；短于该时长时跳过声纹识别/聚类，
 # 避免误匹配已知参会人或把同一人拆成多个 ID。
 MIN_SPEAKER_EMBEDDING_SECONDS = 3.0
+PCM_SAMPLE_RATE = 16000
+MAX_SINGLE_SPEAKER_SEGMENT_SECONDS = 10.0
+MIN_SPLIT_SEGMENT_SECONDS = 1.8
+SILENCE_SPLIT_SECONDS = 0.35
 
 
 def wav_duration_seconds(path: Path) -> float:
@@ -127,6 +131,82 @@ def wav_duration_seconds(path: Path) -> float:
             return wav.getnframes() / rate if rate else 0.0
     except Exception:
         return 0.0
+
+
+def read_wav_pcm16(path: Path) -> bytes:
+    with wave.open(str(path), "rb") as wav:
+        if wav.getnchannels() != 1 or wav.getsampwidth() != 2 or wav.getframerate() != PCM_SAMPLE_RATE:
+            raise ValueError("仅支持 16kHz mono PCM16 wav")
+        return wav.readframes(wav.getnframes())
+
+
+def split_pcm16_for_speaker_turns(pcm_bytes: bytes) -> list[bytes]:
+    """把过长语音段按停顿/最大时长切成更适合声纹识别的小段。
+
+    这不是完整 speaker diarization；它解决的是浏览器端 VAD 没切开，导致一条 30~60 秒
+    final 音频中混入多位说话人的常见问题。若多人无停顿重叠说话，仍需要专门 diarization 模型。
+    """
+    total_samples = len(pcm_bytes) // 2
+    if total_samples <= int(MAX_SINGLE_SPEAKER_SEGMENT_SECONDS * PCM_SAMPLE_RATE):
+        return [pcm_bytes]
+
+    audio = np.frombuffer(pcm_bytes, dtype=np.int16)
+    if audio.size == 0:
+        return []
+
+    frame_samples = int(0.02 * PCM_SAMPLE_RATE)
+    silence_frames_needed = max(1, int(SILENCE_SPLIT_SECONDS / 0.02))
+    min_samples = int(MIN_SPLIT_SEGMENT_SECONDS * PCM_SAMPLE_RATE)
+    max_samples = int(MAX_SINGLE_SPEAKER_SEGMENT_SECONDS * PCM_SAMPLE_RATE)
+    # 使用比前端触发阈值略低的能量阈值找“停顿”，避免轻微底噪阻止切分。
+    energy_threshold = max(0.0025, min(runtime_config.get().energy_threshold, 0.008) * 0.55)
+
+    silent_runs: list[tuple[int, int]] = []
+    run_start: int | None = None
+    for start in range(0, audio.size, frame_samples):
+        frame = audio[start:start + frame_samples].astype(np.float32) / 32768.0
+        if frame.size == 0:
+            continue
+        rms = float(np.sqrt(np.mean(frame * frame)))
+        if rms < energy_threshold:
+            if run_start is None:
+                run_start = start
+        elif run_start is not None:
+            if (start - run_start) // frame_samples >= silence_frames_needed:
+                silent_runs.append((run_start, start))
+            run_start = None
+    if run_start is not None and (audio.size - run_start) // frame_samples >= silence_frames_needed:
+        silent_runs.append((run_start, audio.size))
+
+    split_points = [(start + end) // 2 for start, end in silent_runs]
+    segments: list[bytes] = []
+    start = 0
+    while start < total_samples:
+        remaining = total_samples - start
+        if remaining <= max_samples:
+            end = total_samples
+        else:
+            lower = start + min_samples
+            upper = start + max_samples
+            candidates = [point for point in split_points if lower <= point <= upper]
+            end = candidates[-1] if candidates else upper
+
+        if end <= start:
+            break
+        segment = pcm_bytes[start * 2:end * 2]
+        if len(segment) >= min_samples * 2 or not segments:
+            segments.append(segment)
+        elif segments:
+            segments[-1] += segment
+        start = end
+
+    if len(segments) > 1:
+        logger.info(
+            "长语音段已按停顿/时长切分：%.1fs -> %s",
+            total_samples / PCM_SAMPLE_RATE,
+            [round((len(item) // 2) / PCM_SAMPLE_RATE, 1) for item in segments],
+        )
+    return segments or [pcm_bytes]
 
 
 def unknown_speaker_dir(session_id: str) -> Path:
@@ -264,6 +344,40 @@ async def create_message_from_text_audio(
     return message
 
 
+async def create_messages_from_pcm_segment(
+    session: Session,
+    original_text: str,
+    pcm_bytes: bytes,
+    audio_prefix: str,
+    speaker_identity_id: str | None = None,
+) -> list[Message]:
+    """从一段 PCM final 音频创建消息；长段会先二次切分并逐段 ASR/声纹识别。"""
+    audio_dir = storage.session_audio_dir(session.id)
+    split_segments = split_pcm16_for_speaker_turns(pcm_bytes)
+    messages: list[Message] = []
+
+    if len(split_segments) <= 1:
+        wav_path = audio_dir / f"{audio_prefix}.wav"
+        write_pcm16_wav(wav_path, pcm_bytes)
+        messages.append(await create_message_from_text_audio(session, original_text, wav_path, speaker_identity_id))
+        return messages
+
+    for index, child_pcm in enumerate(split_segments):
+        wav_path = audio_dir / f"{audio_prefix}_part{index + 1}.wav"
+        write_pcm16_wav(wav_path, child_pcm)
+        transcript_segments = await asyncio.to_thread(transcribe_audio_file, str(wav_path))
+        child_text = "".join(segment.get("text", "") for segment in transcript_segments).strip()
+        if not child_text:
+            continue
+        messages.append(await create_message_from_text_audio(session, child_text, wav_path, None))
+
+    if not messages:
+        wav_path = audio_dir / f"{audio_prefix}.wav"
+        write_pcm16_wav(wav_path, pcm_bytes)
+        messages.append(await create_message_from_text_audio(session, original_text, wav_path, speaker_identity_id))
+    return messages
+
+
 async def process_audio_file(session_id: str, file: UploadFile) -> list[Message]:
     session = load_session(session_id)
     message_id = f"message_{uuid4().hex[:10]}"
@@ -276,6 +390,24 @@ async def process_audio_file(session_id: str, file: UploadFile) -> list[Message]
         audio_service.convert_to_wav(raw_path, wav_path)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=f"音频格式无法解析：{exc}") from exc
+
+    try:
+        split_segments = split_pcm16_for_speaker_turns(read_wav_pcm16(wav_path))
+    except Exception:
+        split_segments = []
+
+    if len(split_segments) > 1:
+        new_messages: list[Message] = []
+        for index, pcm_bytes in enumerate(split_segments):
+            child_wav_path = audio_dir / f"{message_id}_part{index + 1}.wav"
+            write_pcm16_wav(child_wav_path, pcm_bytes)
+            transcript_segments = await asyncio.to_thread(transcribe_audio_file, str(child_wav_path))
+            child_text = "".join(segment.get("text", "") for segment in transcript_segments).strip()
+            if not child_text:
+                continue
+            new_messages.append(await create_message_from_text_audio(session, child_text, child_wav_path, None))
+        if new_messages:
+            return new_messages
 
     # ASR 与声纹推理都是 CPU 密集任务，放到线程池，避免阻塞事件循环。
     transcript_segments = await asyncio.to_thread(transcribe_audio_file, str(wav_path))
@@ -454,10 +586,15 @@ async def stream_meeting_audio_funasr(websocket: WebSocket, meeting_id: str) -> 
             speaker_identity_id = None
             return
 
-        wav_path = storage.session_audio_dir(meeting_id) / f"message_{uuid4().hex[:10]}_funasr.wav"
-        write_pcm16_wav(wav_path, bytes(segment_pcm))
-        message = await create_message_from_text_audio(session, text, wav_path, speaker_identity_id)
-        await websocket.send_json({"type": "final", "message": message.model_dump()})
+        messages = await create_messages_from_pcm_segment(
+            session,
+            text,
+            bytes(segment_pcm),
+            f"message_{uuid4().hex[:10]}_funasr",
+            speaker_identity_id,
+        )
+        for message in messages:
+            await websocket.send_json({"type": "final", "message": message.model_dump()})
         segment_pcm = bytearray()
         segment_text = ""
         speaker_identity_id = None
