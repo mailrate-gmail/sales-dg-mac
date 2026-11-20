@@ -1584,7 +1584,7 @@ export function App() {
             <div className="recording-status">{recordingStatus}</div>
             <div className="messages">
               {messages.length === 0 && <div className="empty">暂无会话内容</div>}
-              {messages.map((message) => (
+              {[...messages].reverse().map((message) => (
                 <div className={`message ${message.role}`} key={message.id}>
                   <div className="message-header">
                     <strong>{message.speaker_name}{message.corrected ? '（已修正）' : ''}</strong>
