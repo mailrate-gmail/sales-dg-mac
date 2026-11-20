@@ -210,6 +210,12 @@ func makeRecognitionResultHandler(
 
 @MainActor
 final class TranscriptClient {
+    struct MeetingSnapshot {
+        let id: String
+        let title: String
+        let messageCount: Int
+    }
+
     private var config: AgentConfig
     private let window: TranscriptWindowController
 
@@ -220,6 +226,73 @@ final class TranscriptClient {
 
     func updateConfig(_ config: AgentConfig) {
         self.config = config
+    }
+
+    func loadMeeting(_ meetingId: String, completion: @escaping @MainActor (Result<MeetingSnapshot?, Error>) -> Void) {
+        guard !meetingId.isEmpty else {
+            completion(.success(nil))
+            return
+        }
+        guard var components = URLComponents(string: config.backendBaseURL) else {
+            completion(.failure(AgentError.message("后端地址无效：\(config.backendBaseURL)")))
+            return
+        }
+        components.path = "/api/meetings/\(meetingId)"
+        guard let url = components.url else {
+            completion(.failure(AgentError.message("后端会议查询地址无效")))
+            return
+        }
+
+        URLSession.shared.dataTask(with: url) { data, response, error in
+            Task { @MainActor in
+                if let error {
+                    AgentLog.write("Load meeting failed id=\(meetingId) error=\(error.localizedDescription)")
+                    completion(.failure(error))
+                    return
+                }
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                if status == 404 {
+                    completion(.success(nil))
+                    return
+                }
+                guard (200...299).contains(status), let data else {
+                    let body = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+                    completion(.failure(AgentError.message("查询会议失败 HTTP \(status)：\(body)")))
+                    return
+                }
+                guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    completion(.failure(AgentError.message("查询会议响应无法解析")))
+                    return
+                }
+                let title = json["title"] as? String ?? ""
+                let messages = json["messages"] as? [Any] ?? []
+                completion(.success(MeetingSnapshot(id: meetingId, title: title, messageCount: messages.count)))
+            }
+        }.resume()
+    }
+
+    func ensureLaunchMeeting(completion: @escaping @MainActor (Result<String, Error>) -> Void) {
+        loadMeeting(config.meetingId) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success(let snapshot):
+                if let snapshot, snapshot.messageCount == 0, self.isAgentMeetingTitle(snapshot.title) {
+                    AgentLog.write("Reuse empty launch meeting id=\(snapshot.id) title=\(snapshot.title)")
+                    completion(.success(snapshot.id))
+                } else {
+                    self.createMeeting(completion: completion)
+                }
+            case .failure(let error):
+                AgentLog.write("Load existing meeting before create failed: \(error.localizedDescription)")
+                self.createMeeting(completion: completion)
+            }
+        }
+    }
+
+    private func isAgentMeetingTitle(_ title: String) -> Bool {
+        let customerName = config.customerName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let expectedPrefix = customerName?.isEmpty == false ? customerName! : "macOS 语音会议"
+        return title == "\(expectedPrefix)会谈" || title.contains("macOS 语音会议")
     }
 
     func createMeeting(completion: @escaping @MainActor (Result<String, Error>) -> Void) {
@@ -634,15 +707,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         setState(.loading)
-        windowController.append("正在通知 server 新建会议...")
-        transcriptClient.createMeeting { [weak self] result in
+        windowController.append("正在准备会议（优先复用空的 macOS Agent 会议）...")
+        transcriptClient.ensureLaunchMeeting { [weak self] result in
             guard let self else { return }
             switch result {
             case .success(let meetingId):
                 self.config.meetingId = meetingId
                 AgentConfig.save(self.config)
                 self.transcriptClient.updateConfig(self.config)
-                self.windowController.append("server 已新建会议：\(meetingId)")
+                self.windowController.append("当前会议：\(meetingId)")
                 self.updateStatusBar()
                 self.speechController.start()
             case .failure(let error):

@@ -96,7 +96,7 @@ tail -f ~/Library/Logs/SalesDGMacAgent/agent.log
 
 说明：
 
-- `createMeetingOnLaunch`：默认 `true`，启动时自动调用 server 新建会议，并把返回的会议 ID 写回 `meetingId`；如需继续写入某个已有会议，可设为 `false` 后手动填写 `meetingId`；
+- `createMeetingOnLaunch`：默认 `true`，启动时会优先复用上一次由 macOS Agent 创建且仍为 0 记录的会议；如果该会议已有记录，则自动调用 server 新建会议，并把返回的会议 ID 写回 `meetingId`。如需继续写入某个已有会议，可设为 `false` 后手动填写 `meetingId`；
 - `customerName`：自动新建会议时发送给 server 的客户/会议名称；
 - `meetingGoal`：自动新建会议时发送给 server 的会议目标；
 - `meetingId`：当前会议 ID；自动新建成功后会更新为 server 返回的日期+时分秒 ID；

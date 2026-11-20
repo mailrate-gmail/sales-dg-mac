@@ -710,6 +710,38 @@ export function App() {
     await loadSessions()
   }
 
+  async function cleanupEmptyMacMeetings() {
+    const targets = sessions.filter((session) => session.message_count === 0 && session.title.includes('macOS 语音会议'))
+    if (targets.length === 0) {
+      alert('没有需要清理的空 macOS 语音会议。')
+      return
+    }
+    const ok = confirm(`确认删除 ${targets.length} 个 0 记录的 macOS 语音会议吗？\n\n按回车可确认删除。`)
+    if (!ok) return
+
+    for (const target of targets) {
+      const res = await fetch(`${API_BASE}/api/meetings/${encodeURIComponent(target.id)}`, { method: 'DELETE' })
+      if (!res.ok) {
+        alert(`删除会议失败：${target.title}`)
+        break
+      }
+    }
+    if (targets.some((target) => target.id === sessionId)) {
+      setSessionId('')
+      activeSessionIdRef.current = ''
+      setSessionTitle('')
+      setMessages([])
+      setSpeakerNames({})
+      setSpeakerPushTargets({})
+      setSpeakerPanelStartIndex(0)
+      setAiQas([])
+      setAgentMemory(null)
+      setLatestSuggestion('')
+      setSummary('')
+    }
+    await loadSessions()
+  }
+
   async function startRecording() {
     if (!sessionId) {
       alert('请先新建会议并进入会议室')
@@ -1311,7 +1343,10 @@ export function App() {
             <h1>历史会议</h1>
             <p>查看本地保存的会议记录，并可重新进入会议室查看或继续导出。</p>
           </div>
-          <button onClick={loadSessions}>刷新</button>
+          <div className="history-actions">
+            <button className="secondary-action" onClick={cleanupEmptyMacMeetings}>清理空 macOS 会议</button>
+            <button onClick={loadSessions}>刷新</button>
+          </div>
         </div>
         <div className="history-list">
           {sessions.length === 0 && <div className="empty">暂无历史会议</div>}
