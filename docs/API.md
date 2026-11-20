@@ -166,7 +166,24 @@ FastAPI 默认错误格式：
 
 > **AI 回复过滤**：`need_reply` 表示发言人被指定为“需要答复”，`should_reply` 表示本地规则判定这条发言是问题/明确请求。只有两者都为 `true` 时才会调用远程 LLM 生成 `ai_suggestion`。说明、示例、解释等内容（`context_note`）会有 `need_reply=true` 但 `should_reply=false`，`ai_suggestion` 为 `null`，不会出现在 AI Q&A 区，但其文本会写入 Agent 记忆的 `context_notes` / `key_facts`，供后续回复与总结参考。`utterance_labels` 与 `analysis_reason` 用于追溯过滤依据。
 
-### 3.4 上传会议音频片段并处理
+### 3.4 删除会议
+
+### DELETE `/api/meetings/{meeting_id}`
+
+删除指定会议及相关本地文件，包括会议记录、Agent 记忆、音频目录、未知说话人聚类目录和导出 Markdown 文件。
+
+**响应示例**
+
+```json
+{
+  "deleted": true,
+  "id": "20261118_103000"
+}
+```
+
+> 兼容接口：`DELETE /api/sessions/{session_id}`。
+
+### 3.5 上传会议音频片段并处理
 
 ### POST `/api/meetings/{meeting_id}/audio`
 
@@ -222,7 +239,7 @@ curl -X POST \
 ]
 ```
 
-### 3.5 写入外部系统 ASR 文本
+### 3.6 写入外部系统 ASR 文本
 
 ### POST `/api/meetings/{meeting_id}/transcripts`
 
@@ -282,7 +299,7 @@ curl -X POST \
 
 返回写入后的 `Message`。后端会照常更新会议记忆，并在满足 `need_reply=true` 且本地规则判断为问题/明确请求时生成 AI 建议回复。
 
-### 3.6 绑定识别个体 ID 与参会人员名称
+### 3.7 绑定识别个体 ID 与参会人员名称
 
 ### PUT `/api/meetings/{meeting_id}/speakers/{speaker_identity_id}`
 
@@ -317,7 +334,7 @@ curl -X POST \
 }
 ```
 
-### 3.7 手动修正单条消息说话人
+### 3.8 手动修正单条消息说话人
 
 ### PUT `/api/sessions/{session_id}/messages/{message_id}/speaker`
 
@@ -344,7 +361,7 @@ curl -X POST \
 
 返回修正后的 `Message`。
 
-### 3.8 结束会议
+### 3.9 结束会议
 
 ### POST `/api/meetings/{meeting_id}/end`
 
@@ -354,7 +371,7 @@ curl -X POST \
 
 返回更新后的会议详情。
 
-### 3.9 生成会议总结
+### 3.10 生成会议总结
 
 ### POST `/api/meetings/{meeting_id}/summary`
 
@@ -368,7 +385,7 @@ curl -X POST \
 }
 ```
 
-### 3.10 导出会议 Markdown
+### 3.11 导出会议 Markdown
 
 ### POST `/api/meetings/{meeting_id}/export`
 

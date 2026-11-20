@@ -4,6 +4,7 @@ from uuid import uuid4
 import asyncio
 import logging
 import secrets
+import shutil
 import wave
 import numpy as np
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -100,6 +101,29 @@ def load_session(session_id: str) -> Session:
 
 def save_session(session: Session) -> None:
     storage.write_json(storage.session_file(session.id), session.model_dump())
+
+
+def delete_session_data(session_id: str) -> None:
+    session_path = storage.session_file(session_id)
+    if not session_path.exists():
+        raise HTTPException(status_code=404, detail="会议不存在。")
+
+    related_paths = [
+        session_path,
+        storage.sessions_dir / f"{session_id}.memory.json",
+        storage.exports_dir / f"{session_id}.md",
+    ]
+    related_dirs = [
+        storage.audio_dir / session_id,
+        storage.sessions_dir / f"{session_id}_unknown_speakers",
+    ]
+
+    for path in related_paths:
+        if path.exists() and path.is_file():
+            path.unlink()
+    for path in related_dirs:
+        if path.exists() and path.is_dir():
+            shutil.rmtree(path)
 
 
 def create_session_from_title_goal(title: str, goal: str) -> Session:
@@ -699,6 +723,12 @@ def get_meeting(meeting_id: str) -> Session:
     return load_session(meeting_id)
 
 
+@app.delete("/api/meetings/{meeting_id}")
+def delete_meeting(meeting_id: str) -> dict:
+    delete_session_data(meeting_id)
+    return {"deleted": True, "id": meeting_id}
+
+
 @app.post("/api/meetings/{meeting_id}/audio", response_model=list[Message])
 async def upload_meeting_audio(meeting_id: str, file: UploadFile = File(...)) -> list[Message]:
     return await process_audio_file(meeting_id, file)
@@ -964,6 +994,12 @@ def list_sessions() -> list[SessionSummary]:
 @app.get("/api/sessions/{session_id}", response_model=Session)
 def get_session(session_id: str) -> Session:
     return load_session(session_id)
+
+
+@app.delete("/api/sessions/{session_id}")
+def delete_session(session_id: str) -> dict:
+    delete_session_data(session_id)
+    return {"deleted": True, "id": session_id}
 
 
 @app.put("/api/sessions/{session_id}/messages/{message_id}/speaker", response_model=Message)

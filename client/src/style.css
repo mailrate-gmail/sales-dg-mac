@@ -373,10 +373,10 @@ code {
 }
 
 .history-item {
-  display: grid;
-  gap: 8px;
-  text-align: left;
-  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   background: var(--panel-soft);
   border: 1px solid var(--border);
   padding: 16px;
@@ -386,8 +386,28 @@ code {
   background: var(--input);
 }
 
-.history-item span,
-.history-item small,
+.history-open {
+  flex: 1;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+}
+
+.history-open:hover {
+  background: transparent;
+}
+
+.history-delete {
+  flex: 0 0 auto;
+}
+
+.history-open span,
+.history-open small,
 .empty,
 .field-hint {
   color: var(--muted);

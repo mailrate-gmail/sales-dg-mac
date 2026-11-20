@@ -685,6 +685,31 @@ export function App() {
     await loadAgentMemory(data.id)
   }
 
+  async function deleteHistorySession(id: string, title: string) {
+    const ok = confirm(`确认删除会议“${title}”吗？\n\n将同时删除会议记录、Agent 记忆、音频文件和导出文件。\n\n按回车可确认删除。`)
+    if (!ok) return
+
+    const res = await fetch(`${API_BASE}/api/meetings/${encodeURIComponent(id)}`, { method: 'DELETE' })
+    if (!res.ok) {
+      alert('删除会议失败')
+      return
+    }
+    if (sessionId === id) {
+      setSessionId('')
+      activeSessionIdRef.current = ''
+      setSessionTitle('')
+      setMessages([])
+      setSpeakerNames({})
+      setSpeakerPushTargets({})
+      setSpeakerPanelStartIndex(0)
+      setAiQas([])
+      setAgentMemory(null)
+      setLatestSuggestion('')
+      setSummary('')
+    }
+    await loadSessions()
+  }
+
   async function startRecording() {
     if (!sessionId) {
       alert('请先新建会议并进入会议室')
@@ -1291,11 +1316,16 @@ export function App() {
         <div className="history-list">
           {sessions.length === 0 && <div className="empty">暂无历史会议</div>}
           {sessions.map((session) => (
-            <button className="history-item" key={session.id} onClick={() => openSession(session.id)}>
-              <strong>{session.title}</strong>
-              <span>{session.goal || '未填写会晤目标'}</span>
-              <small>{session.started_at} · {session.message_count} 条记录 · {session.has_summary ? '已总结' : '未总结'}</small>
-            </button>
+            <div className="history-item" key={session.id}>
+              <button className="history-open" onClick={() => openSession(session.id)}>
+                <strong>{session.title}</strong>
+                <span>{session.goal || '未填写会晤目标'}</span>
+                <small>{session.started_at} · {session.message_count} 条记录 · {session.has_summary ? '已总结' : '未总结'}</small>
+              </button>
+              <button className="danger subtle-danger history-delete" onClick={() => deleteHistorySession(session.id, session.title)}>
+                删除
+              </button>
+            </div>
           ))}
         </div>
       </section>
