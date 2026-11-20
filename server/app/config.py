@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     server_port: int = 8000
     data_dir: str = "/app/data"
     transcript_ingest_token: str = ""
+    meeting_timezone: str = "Asia/Shanghai"
 
     whisper_model: str = "small"
     whisper_device: str = "cpu"

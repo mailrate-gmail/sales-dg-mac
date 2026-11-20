@@ -7,17 +7,12 @@ from fastapi import HTTPException
 from app.main import create_session_from_title_goal
 
 
-class FixedDatetime:
-    @staticmethod
-    def now():
-        return real_datetime(2026, 11, 20, 11, 15, 30)
-
-
 class TestSessionId(unittest.TestCase):
     def test_session_id_uses_date_time_seconds(self):
         session_path = Mock()
         session_path.exists.return_value = False
-        with patch("app.main.datetime", FixedDatetime), patch("app.main.storage.session_file", return_value=session_path), patch(
+        fixed_now = real_datetime(2026, 11, 20, 11, 15, 30)
+        with patch("app.main.local_now", return_value=fixed_now), patch("app.main.storage.session_file", return_value=session_path), patch(
             "app.main.save_session"
         ):
             session = create_session_from_title_goal("测试会谈", "测试目标")
@@ -28,7 +23,8 @@ class TestSessionId(unittest.TestCase):
     def test_session_id_collision_returns_409(self):
         session_path = Mock()
         session_path.exists.return_value = True
-        with patch("app.main.datetime", FixedDatetime), patch("app.main.storage.session_file", return_value=session_path):
+        fixed_now = real_datetime(2026, 11, 20, 11, 15, 30)
+        with patch("app.main.local_now", return_value=fixed_now), patch("app.main.storage.session_file", return_value=session_path):
             with self.assertRaises(HTTPException) as ctx:
                 create_session_from_title_goal("测试会谈", "测试目标")
 

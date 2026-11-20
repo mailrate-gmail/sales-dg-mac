@@ -65,6 +65,9 @@ tail -f ~/Library/Logs/SalesDGMacAgent/agent.log
 ```json
 {
   "backendBaseURL": "http://localhost:8000",
+  "createMeetingOnLaunch": true,
+  "customerName": "macOS 语音会议",
+  "meetingGoal": "通过 macOS 系统语音识别记录会议内容。",
   "ingestToken": null,
   "localeIdentifier": "zh-CN",
   "meetingId": "20261120_103000",
@@ -93,7 +96,10 @@ tail -f ~/Library/Logs/SalesDGMacAgent/agent.log
 
 说明：
 
-- `meetingId`：当前会议 ID；
+- `createMeetingOnLaunch`：默认 `true`，启动时自动调用 server 新建会议，并把返回的会议 ID 写回 `meetingId`；如需继续写入某个已有会议，可设为 `false` 后手动填写 `meetingId`；
+- `customerName`：自动新建会议时发送给 server 的客户/会议名称；
+- `meetingGoal`：自动新建会议时发送给 server 的会议目标；
+- `meetingId`：当前会议 ID；自动新建成功后会更新为 server 返回的日期+时分秒 ID；
 - `participantId`：建议填写后端已有参会人 ID；只有后端参会人配置为 `need_reply=true` 时才会触发 AI 回复；
 - `ingestToken`：如果后端 `.env` 配置了 `TRANSCRIPT_INGEST_TOKEN`，这里填写相同 token；
 - `localeIdentifier`：默认 `zh-CN`，可改为 `en-US` 等。

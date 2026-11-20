@@ -6,6 +6,7 @@ import logging
 import secrets
 import wave
 import numpy as np
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import Body, FastAPI, File, Form, Header, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -58,8 +59,16 @@ app.add_middleware(
 )
 
 
+def local_now() -> datetime:
+    try:
+        return datetime.now(ZoneInfo(settings.meeting_timezone))
+    except ZoneInfoNotFoundError:
+        logger.warning("会议时区配置无效，降级使用系统本地时区：%s", settings.meeting_timezone)
+        return datetime.now().astimezone()
+
+
 def now_iso() -> str:
-    return datetime.now().isoformat(timespec="seconds")
+    return local_now().isoformat(timespec="seconds")
 
 
 def load_participants() -> list[Participant]:
@@ -94,7 +103,7 @@ def save_session(session: Session) -> None:
 
 
 def create_session_from_title_goal(title: str, goal: str) -> Session:
-    session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    session_id = local_now().strftime("%Y%m%d_%H%M%S")
     if storage.session_file(session_id).exists():
         raise HTTPException(status_code=409, detail="会议 ID 已存在，请稍后重试。")
     session = Session(

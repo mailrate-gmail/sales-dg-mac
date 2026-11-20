@@ -48,6 +48,9 @@ struct AgentConfig: Codable {
     var meetingId: String
     var ingestToken: String?
     var localeIdentifier: String
+    var createMeetingOnLaunch: Bool?
+    var customerName: String?
+    var meetingGoal: String?
     var speakers: [Speaker]
 
     static let path = FileManager.default.homeDirectoryForCurrentUser
@@ -59,6 +62,9 @@ struct AgentConfig: Codable {
             meetingId: defaultMeetingId(),
             ingestToken: nil,
             localeIdentifier: "zh-CN",
+            createMeetingOnLaunch: true,
+            customerName: "macOS 语音会议",
+            meetingGoal: "通过 macOS 系统语音识别记录会议内容。",
             speakers: [
                 Speaker(key: 1, name: "客户一", participantId: nil, role: "customer"),
                 Speaker(key: 2, name: "我方", participantId: nil, role: "self"),
@@ -76,10 +82,24 @@ struct AgentConfig: Codable {
     static func loadOrCreateSample() -> AgentConfig {
         let decoder = JSONDecoder()
         if let data = try? Data(contentsOf: path), var config = try? decoder.decode(AgentConfig.self, from: data) {
+            var changed = false
             if config.meetingId == "session_xxx" || config.meetingId.isEmpty {
                 config.meetingId = defaultMeetingId()
-                save(config)
+                changed = true
             }
+            if config.createMeetingOnLaunch == nil {
+                config.createMeetingOnLaunch = true
+                changed = true
+            }
+            if config.customerName == nil {
+                config.customerName = "macOS 语音会议"
+                changed = true
+            }
+            if config.meetingGoal == nil {
+                config.meetingGoal = "通过 macOS 系统语音识别记录会议内容。"
+                changed = true
+            }
+            if changed { save(config) }
             return config
         }
 
@@ -167,12 +187,68 @@ extension DateFormatter {
 
 @MainActor
 final class TranscriptClient {
-    private let config: AgentConfig
+    private var config: AgentConfig
     private let window: TranscriptWindowController
 
     init(config: AgentConfig, window: TranscriptWindowController) {
         self.config = config
         self.window = window
+    }
+
+    func updateConfig(_ config: AgentConfig) {
+        self.config = config
+    }
+
+    func createMeeting(completion: @escaping @MainActor (Result<String, Error>) -> Void) {
+        guard var components = URLComponents(string: config.backendBaseURL) else {
+            completion(.failure(AgentError.message("后端地址无效：\(config.backendBaseURL)")))
+            return
+        }
+        components.path = "/api/meetings"
+        guard let url = components.url else {
+            completion(.failure(AgentError.message("后端会议接口地址无效")))
+            return
+        }
+
+        let payload: [String: Any] = [
+            "customer_name": (config.customerName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? config.customerName! : "macOS 语音会议"),
+            "goal": config.meetingGoal ?? ""
+        ]
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+        AgentLog.write("Create meeting begin customer=\(payload["customer_name"] ?? "")")
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            Task { @MainActor in
+                if let error {
+                    AgentLog.write("Create meeting failed error=\(error.localizedDescription)")
+                    completion(.failure(error))
+                    return
+                }
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                guard (200...299).contains(status) else {
+                    let body = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+                    AgentLog.write("Create meeting failed status=\(status) body=\(body)")
+                    completion(.failure(AgentError.message("新建会议失败 HTTP \(status)：\(body)")))
+                    return
+                }
+                guard
+                    let data,
+                    let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                    let meetingId = json["id"] as? String,
+                    !meetingId.isEmpty
+                else {
+                    AgentLog.write("Create meeting response missing id")
+                    completion(.failure(AgentError.message("新建会议响应缺少 id")))
+                    return
+                }
+                AgentLog.write("Create meeting ok id=\(meetingId)")
+                completion(.success(meetingId))
+            }
+        }.resume()
     }
 
     func post(text: String, speaker: AgentConfig.Speaker?) {
@@ -228,6 +304,17 @@ final class TranscriptClient {
                 AgentLog.write("POST transcript ok status=\(status)")
             }
         }.resume()
+    }
+}
+
+enum AgentError: LocalizedError {
+    case message(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .message(let value):
+            return value
+        }
     }
 }
 
@@ -489,7 +576,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         AgentLog.write("applicationDidFinishLaunching")
         config = AgentConfig.loadOrCreateSample()
-        AgentLog.write("Loaded config path=\(AgentConfig.path.path) backend=\(config.backendBaseURL) meetingId=\(config.meetingId)")
+        AgentLog.write("Loaded config path=\(AgentConfig.path.path) backend=\(config.backendBaseURL) meetingId=\(config.meetingId) createMeetingOnLaunch=\(config.createMeetingOnLaunch != false)")
         windowController = TranscriptWindowController()
         transcriptClient = TranscriptClient(config: config, window: windowController)
         speechController = SpeechController(config: config, window: windowController, transcriptClient: transcriptClient) { [weak self] state in
@@ -514,11 +601,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         windowController.append("配置文件：\(AgentConfig.path.path)")
         windowController.append("F1-F10 切换发言人，F11 暂停/继续，F12 退出，⌃⌥E 打开窗口")
 
-        if config.meetingId.isEmpty {
-            windowController.show()
-            windowController.append("请先编辑配置文件中的 meetingId 和 speakers。")
+        prepareMeetingAndStartSpeech()
+    }
+
+    private func prepareMeetingAndStartSpeech() {
+        if config.createMeetingOnLaunch == false {
+            windowController.append("使用配置中的会议 ID：\(config.meetingId)")
+            speechController.start()
+            return
         }
-        speechController.start()
+
+        setState(.loading)
+        windowController.append("正在通知 server 新建会议...")
+        transcriptClient.createMeeting { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success(let meetingId):
+                self.config.meetingId = meetingId
+                AgentConfig.save(self.config)
+                self.transcriptClient.updateConfig(self.config)
+                self.windowController.append("server 已新建会议：\(meetingId)")
+                self.speechController.start()
+            case .failure(let error):
+                self.windowController.show()
+                self.windowController.append("server 新建会议失败：\(error.localizedDescription)")
+                self.windowController.append("请确认后端已启动，或在配置中设置 createMeetingOnLaunch=false 后手动指定 meetingId。")
+                AgentLog.write("Create meeting before speech failed: \(error.localizedDescription)")
+                self.setState(.error)
+            }
+        }
     }
 
     private func makeMenu() -> NSMenu {
