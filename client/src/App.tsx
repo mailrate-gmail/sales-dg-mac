@@ -1570,7 +1570,7 @@ export function App() {
               <h2>实时会话</h2>
               <div className="section-actions">
                 <span>当前能量：{energyLevel.toFixed(4)} / 触发阈值：{Math.min(config.energy_threshold || VOICE_ENERGY_TRIGGER, VOICE_ENERGY_TRIGGER)} / 停顿 {VOICE_GAP_SPLIT_MS / 1000}s 切分</span>
-                <button className="secondary-action" onClick={clearRealtimeConversation}>清空</button>
+                <button type="button" className="secondary-action conversation-clear-action" onClick={clearRealtimeConversation}>清空</button>
               </div>
             </div>
             <div className="recording-status">{recordingStatus}</div>
