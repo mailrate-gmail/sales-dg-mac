@@ -37,7 +37,7 @@ class TestExternalTranscript(unittest.IsolatedAsyncioTestCase):
             text="客户说明了当前情况。",
             speaker_name="客户",
             role="customer",
-            source="android_system_asr",
+            source="macos_speech_asr",
         )
 
         with patch("app.main.load_participants", return_value=[]), patch("app.main.save_session") as save_session, patch(
@@ -50,7 +50,7 @@ class TestExternalTranscript(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(message.role, "customer")
         self.assertIsNone(message.audio_file)
         self.assertIsNone(message.speaker_score)
-        self.assertEqual(message.source, "android_system_asr")
+        self.assertEqual(message.source, "macos_speech_asr")
         self.assertFalse(message.need_reply)
         suggest_reply.assert_not_called()
         save_session.assert_called_once()

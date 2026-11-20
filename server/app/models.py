@@ -71,7 +71,7 @@ class ExternalTranscriptCreate(BaseModel):
     speaker_name: Optional[str] = None
     role: Role = "unknown"
     need_reply: Optional[bool] = None
-    source: str = "android_system_asr"
+    source: str = "external_system_asr"
     recognized_at: Optional[str] = None
 
 

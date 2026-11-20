@@ -220,11 +220,11 @@ curl -X POST \
 ]
 ```
 
-### 3.5 写入 Android / 外部 ASR 文本
+### 3.5 写入外部系统 ASR 文本
 
 ### POST `/api/meetings/{meeting_id}/transcripts`
 
-用于 Android 原生方案 A：手机端使用系统 ASR 识别文本并由用户手动选择发言人，然后只把文本写入后端。该接口**不上传音频、不做声纹识别**，用于降低手机端隐私风险和实现复杂度。
+用于 macOS Agent 等本地工具使用系统 ASR 识别文本并由用户手动选择发言人，然后只把文本写入后端。该接口**不上传音频、不做声纹识别**，用于降低本地采集端隐私风险和实现复杂度。
 
 如果服务端配置了：
 
@@ -247,7 +247,7 @@ Authorization: Bearer your-token
   "speaker_name": "张总",
   "role": "customer",
   "need_reply": true,
-  "source": "android_system_asr",
+  "source": "macos_speech_asr",
   "recognized_at": "2026-11-20T10:30:00"
 }
 ```
@@ -256,13 +256,13 @@ Authorization: Bearer your-token
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `text` | string | 是 | Android 系统 ASR 识别后的 final 文本，通常已带标点 |
+| `text` | string | 是 | 外部系统 ASR 识别后的 final 文本，通常已带标点 |
 | `participant_id` | string | 否 | 已登记参会人 ID；传入后以后端参会人配置为准 |
 | `speaker_name` | string | 否 | 未传 `participant_id` 时使用的显示名称 |
 | `role` | string | 否 | `self` / `customer` / `other` / `unknown`，默认 `unknown` |
 | `need_reply` | boolean | 否 | 兼容字段；为安全起见，只有传入有效 `participant_id` 时才以后端参会人配置决定是否触发 AI 回复 |
-| `source` | string | 否 | 来源标记，默认 `android_system_asr` |
-| `recognized_at` | string | 否 | 手机端识别时间；不传则使用服务端接收时间 |
+| `source` | string | 否 | 来源标记，默认 `external_system_asr`；macOS Agent 使用 `macos_speech_asr` |
+| `recognized_at` | string | 否 | 采集端识别时间；不传则使用服务端接收时间 |
 
 > 安全约束：只有 `participant_id` 有效，且该参会人在后端配置为 `need_reply=true` 时，才可能自动生成 AI 回复。未登记的手动发言人只写入会议上下文，不触发 AI 自动回复。
 
@@ -272,7 +272,7 @@ Authorization: Bearer your-token
 curl -X POST \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your-token" \
-  -d '{"text":"客户刚才问我们是否支持私有化部署。","participant_id":"participant_ab12cd34","source":"android_system_asr"}' \
+  -d '{"text":"客户刚才问我们是否支持私有化部署。","participant_id":"participant_ab12cd34","source":"macos_speech_asr"}' \
   http://localhost:8000/api/meetings/session_20261118_103000_a1b2c3/transcripts
 ```
 

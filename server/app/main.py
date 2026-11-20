@@ -75,10 +75,10 @@ def verify_transcript_ingest_token(authorization: str | None) -> None:
         return
     prefix = "Bearer "
     if not authorization or not authorization.startswith(prefix):
-        raise HTTPException(status_code=401, detail="缺少 Android 转写写入授权。")
+        raise HTTPException(status_code=401, detail="缺少外部转写写入授权。")
     token = authorization[len(prefix) :]
     if not secrets.compare_digest(token, settings.transcript_ingest_token):
-        raise HTTPException(status_code=401, detail="Android 转写写入授权无效。")
+        raise HTTPException(status_code=401, detail="外部转写写入授权无效。")
 
 
 def load_session(session_id: str) -> Session:
@@ -379,7 +379,7 @@ def resolve_external_speaker_fields(payload: ExternalTranscriptCreate) -> dict:
             "need_reply": participant.need_reply,
         }
 
-    speaker_name = (payload.speaker_name or "").strip() or "Android ASR"
+    speaker_name = (payload.speaker_name or "").strip() or "外部 ASR"
     return {
         "participant_id": None,
         "speaker_identity_id": None,
@@ -698,9 +698,9 @@ async def add_external_transcript(
     payload: ExternalTranscriptCreate,
     authorization: str | None = Header(default=None),
 ) -> Message:
-    """接收 Android / 外部 ASR 已识别文本。
+    """接收外部系统 ASR 已识别文本。
 
-    方案 A：发言人由客户端手动选择，本接口不上传音频、不做声纹识别，降低手机端隐私风险。
+    发言人由客户端手动选择，本接口不上传音频、不做声纹识别，降低本地采集端隐私风险。
     """
     verify_transcript_ingest_token(authorization)
     session = load_session(meeting_id)
