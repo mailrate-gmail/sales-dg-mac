@@ -8,3 +8,5 @@ node_modules/
 dist/
 .venv/
 .DS_Store
+macos-agent/.build/
+macos-agent/*.app/
