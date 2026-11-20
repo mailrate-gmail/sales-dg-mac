@@ -5,9 +5,9 @@ macOS 本地无主窗口菜单栏工具，用系统 Speech Framework 做语音�
 ## 功能
 
 - 菜单栏红 / 黄 / 绿灯 + 状态文字显示状态、会议尾号和当前发言人；
-- F1-F10 切换不同发言人；
-- F11 暂停 / 继续；
-- F12 退出；
+- `Control + Option + 1-0` 切换不同发言人；
+- `Control + Option + P` 暂停 / 继续；
+- `Control + Option + Q` 退出；
 - `Control + Option + E` 打开识别窗口；
 - 识别后的 final 文本写入：`POST /api/meetings/{meeting_id}/transcripts`；
 - 不上传原始音频；
@@ -108,22 +108,22 @@ tail -f ~/Library/Logs/SalesDGMacAgent/agent.log
 
 | 快捷键 | 作用 |
 | --- | --- |
-| F1-F10 | 切换当前发言人 |
-| F11 | 暂停 / 继续识别 |
-| F12 | 退出 |
+| Control + Option + 1-0 | 切换当前发言人 |
+| Control + Option + P | 暂停 / 继续识别 |
+| Control + Option + Q | 退出 |
 | Control + Option + E | 打开识别窗口 |
 
-> 如果 F1-F12 被系统功能键占用，请到“系统设置 → 键盘”中调整功能键设置，或按键盘实际布局使用 Fn/Fn Lock。
+> F1-F12 容易被 macOS 系统功能键或其他 App 抢占，默认不再使用。
 
 菜单栏状态示例：
 
 ```text
-🟢 运行 112114 张总
+🟢 录音 112114 张总
 ```
 
 含义：
 
-- 绿灯：正在运行；
+- 绿灯：正在录音识别；
 - `112114`：当前会议 ID 的时分秒尾号；
 - `张总`：当前快捷键选择的发言人。
 
@@ -138,4 +138,4 @@ tail -f ~/Library/Logs/SalesDGMacAgent/agent.log
 
 - macOS 系统语音识别是否自动标点，取决于系统版本、语言和在线服务可用性；
 - 系统 Speech 任务会话可能被 macOS 定期结束，Agent 会自动重启识别任务；
-- F1-F12 全局快捷键可能与系统或其他 App 冲突。
+- `Control + Option + 数字/字母` 全局快捷键仍可能与少数 App 冲突；也可以从状态栏菜单手动选择发言人、暂停或退出。

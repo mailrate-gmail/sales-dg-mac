@@ -541,12 +541,12 @@ final class HotKeyManager {
             return noErr
         }, 1, &eventType, selfPointer, &handler)
 
-        for (index, keyCode) in Self.functionKeyCodes.prefix(10).enumerated() {
-            register(id: index + 1, keyCode: keyCode, modifiers: 0)
+        for (index, keyCode) in Self.numberKeyCodes.enumerated() {
+            register(id: index + 1, keyCode: keyCode, modifiers: Self.defaultModifiers)
         }
-        register(id: 11, keyCode: Self.keyCodeF11, modifiers: 0)
-        register(id: 12, keyCode: Self.keyCodeF12, modifiers: 0)
-        register(id: 101, keyCode: Self.keyCodeE, modifiers: UInt32(controlKey | optionKey))
+        register(id: 11, keyCode: Self.keyCodeP, modifiers: Self.defaultModifiers)
+        register(id: 12, keyCode: Self.keyCodeQ, modifiers: Self.defaultModifiers)
+        register(id: 101, keyCode: Self.keyCodeE, modifiers: Self.defaultModifiers)
     }
 
     private func register(id: Int, keyCode: UInt32, modifiers: UInt32) {
@@ -555,6 +555,9 @@ final class HotKeyManager {
         let status = RegisterEventHotKey(keyCode, modifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
         if status == noErr {
             hotKeys.append(hotKeyRef)
+            AgentLog.write("Hotkey registered id=\(id) keyCode=\(keyCode) modifiers=\(modifiers)")
+        } else {
+            AgentLog.write("Hotkey register failed id=\(id) keyCode=\(keyCode) modifiers=\(modifiers) status=\(status)")
         }
     }
 
@@ -573,9 +576,10 @@ final class HotKeyManager {
         }
     }
 
-    private static let functionKeyCodes: [UInt32] = [122, 120, 99, 118, 96, 97, 98, 100, 101, 109]
-    private static let keyCodeF11: UInt32 = 103
-    private static let keyCodeF12: UInt32 = 111
+    private static let defaultModifiers = UInt32(controlKey | optionKey)
+    private static let numberKeyCodes: [UInt32] = [18, 19, 20, 21, 23, 22, 26, 28, 25, 29]
+    private static let keyCodeP: UInt32 = 35
+    private static let keyCodeQ: UInt32 = 12
     private static let keyCodeE: UInt32 = 14
 }
 
@@ -617,7 +621,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         windowController.setStatus("停止")
         windowController.append("配置文件：\(AgentConfig.path.path)")
-        windowController.append("F1-F10 切换发言人，F11 暂停/继续，F12 退出，⌃⌥E 打开窗口")
+        windowController.append("启动后自动录音。⌃⌥1-0 切换发言人，⌃⌥P 暂停/继续，⌃⌥Q 退出，⌃⌥E 打开窗口")
 
         prepareMeetingAndStartSpeech()
     }
@@ -654,9 +658,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func makeMenu() -> NSMenu {
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "打开识别窗口（⌃⌥E）", action: #selector(showWindow), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "暂停 / 继续（F11）", action: #selector(togglePause), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "暂停 / 继续（⌃⌥P）", action: #selector(togglePause), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "退出（F12）", action: #selector(quit), keyEquivalent: ""))
+        for speaker in config.speakers.sorted(by: { $0.key < $1.key }) {
+            let item = NSMenuItem(title: "发言人 ⌃⌥\(speaker.key % 10)：\(speaker.name)", action: #selector(selectSpeakerFromMenu(_:)), keyEquivalent: "")
+            item.tag = speaker.key
+            menu.addItem(item)
+        }
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "退出（⌃⌥Q）", action: #selector(quit), keyEquivalent: ""))
         return menu
     }
 
@@ -666,6 +676,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func togglePause() {
         speechController.togglePause()
+    }
+
+    @objc private func selectSpeakerFromMenu(_ sender: NSMenuItem) {
+        selectSpeaker(sender.tag)
     }
 
     @objc private func quit() {
@@ -688,7 +702,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .loading:
             windowController.setStatus("加载中")
         case .running:
-            windowController.setStatus("运行")
+            windowController.setStatus("录音")
         case .paused:
             windowController.setStatus("暂停")
         case .error:
@@ -710,7 +724,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .loading:
             return "加载"
         case .running:
-            return "运行"
+            return "录音"
         case .paused:
             return "暂停"
         case .error:
