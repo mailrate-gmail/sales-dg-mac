@@ -20,6 +20,7 @@ class RuntimeConfigService:
             whisper_model=settings.whisper_model,
             whisper_device=settings.whisper_device,
             whisper_compute_type=settings.whisper_compute_type,
+            bilingual_asr_enabled=settings.bilingual_asr_enabled,
             funasr_model=settings.funasr_model,
             funasr_device=settings.funasr_device,
             oci_speech_region=settings.oci_speech_region,

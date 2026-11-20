@@ -201,6 +201,7 @@ class ModelConfig(BaseModel):
     whisper_model: str = "small"
     whisper_device: str = "cpu"
     whisper_compute_type: str = "int8"
+    bilingual_asr_enabled: bool = False
     funasr_model: str = "paraformer-zh-streaming"
     funasr_device: str = "cpu"
     oci_speech_region: str = ""

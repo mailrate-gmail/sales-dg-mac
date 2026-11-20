@@ -406,9 +406,10 @@ async def create_messages_from_pcm_segment(
         if not source_wav_path.exists():
             write_pcm16_wav(source_wav_path, pcm_bytes)
         text = original_text.strip()
-        if not text:
+        if runtime_config.get().bilingual_asr_enabled or not text:
             transcript_segments = await asyncio.to_thread(transcribe_audio_file, str(source_wav_path))
-            text = "".join(segment.get("text", "") for segment in transcript_segments).strip()
+            enhanced_text = "".join(segment.get("text", "") for segment in transcript_segments).strip()
+            text = enhanced_text or text
         if text:
             messages.append(await create_message_from_text_audio(session, text, source_wav_path, speaker_identity_id))
         return messages

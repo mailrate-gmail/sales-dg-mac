@@ -528,6 +528,7 @@ curl -X POST \
   "whisper_model": "small",
   "whisper_device": "cpu",
   "whisper_compute_type": "int8",
+  "bilingual_asr_enabled": false,
   "funasr_model": "paraformer-zh-streaming",
   "funasr_device": "cpu",
   "oci_speech_region": "us-ashburn-1",
@@ -551,6 +552,8 @@ curl -X POST \
 > **API Key 安全**：`GET /api/config` 对已保存的 `llm_api_key` 仅返回掩码 `__MASKED__`；`PUT /api/config` 收到该掩码时保留原密钥，输入新值则覆盖，清空则删除。`POST /api/config/test` 同样会先将掩码还原为已保存密钥再测试。
 
 > **ASR 后端选择**：`asr_provider` 控制短音频上传接口（`POST /api/meetings/{id}/audio` 与 `POST /api/audio/process`）使用的引擎：`funasr_streaming`（默认）用本地 FunASR 流式模型整段识别；`faster_whisper` 用本地 faster-whisper 识别并返回带时间戳分段；`oci_speech` 尚未接入，返回 `501`。会议室实时流式 WebSocket 识别固定使用 FunASR，不受该字段影响。
+
+> **双语识别增强**：`bilingual_asr_enabled` 默认 `false`。开启后，会议 final 音频和 `funasr_streaming` 短音频路径会优先使用 faster-whisper 自动语言识别来增强中英文混合转写；增强失败时回退 FunASR streaming 结果。该选项会加载/使用 faster-whisper 模型，网络或缓存不稳定时建议保持关闭。
 
 > **标点 Provider**：`punctuation_provider` 支持 `funasr_punc` / `asr` / `rule` / `off`。实时 FunASR streaming 的原始 final 通常没有标点，因此默认使用 `funasr_punc`（HuggingFace `funasr/ct-punc`）为 final 文本补标点；前端不再对 final 文本二次补标点。`rule` 仅作为固定保守规则 fallback，不再提供敏感度参数。
 

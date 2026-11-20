@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     whisper_model: str = "small"
     whisper_device: str = "cpu"
     whisper_compute_type: str = "int8"
+    bilingual_asr_enabled: bool = False
     asr_provider: str = "funasr_streaming"
     funasr_model: str = "paraformer-zh-streaming"
     funasr_device: str = "cpu"

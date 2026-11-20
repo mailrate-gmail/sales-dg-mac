@@ -4,15 +4,19 @@
 """
 
 
+import logging
+
 from fastapi import HTTPException
 
 from app.services.runtime_config import runtime_config
 
+logger = logging.getLogger(__name__)
 
-def _transcribe_with_faster_whisper(wav_path: str) -> list[dict]:
+
+def _transcribe_with_faster_whisper(wav_path: str, language: str | None = "zh") -> list[dict]:
     from app.services.asr import asr_service
 
-    return asr_service.transcribe_segments(wav_path)
+    return asr_service.transcribe_segments(wav_path, language=language)
 
 
 def _transcribe_with_funasr(wav_path: str) -> list[dict]:
@@ -34,10 +38,19 @@ def transcribe_audio_file(wav_path: str) -> list[dict]:
 
     采用惰性导入，避免仅做分派判断时就加载 numpy / torch / speechbrain 等重型依赖。
     """
-    provider = runtime_config.get().asr_provider
+    config = runtime_config.get()
+    provider = config.asr_provider
+    whisper_language = None if config.bilingual_asr_enabled else "zh"
     if provider == "faster_whisper":
-        return _transcribe_with_faster_whisper(wav_path)
+        return _transcribe_with_faster_whisper(wav_path, language=whisper_language)
     if provider == "funasr_streaming":
+        if config.bilingual_asr_enabled:
+            try:
+                enhanced = _transcribe_with_faster_whisper(wav_path, language=None)
+                if enhanced:
+                    return enhanced
+            except Exception as exc:
+                logger.warning("双语识别增强不可用，降级到 FunASR streaming：%s", exc)
         return _transcribe_with_funasr(wav_path)
     if provider == "oci_speech":
         raise HTTPException(status_code=501, detail="OCI Speech 尚未接入，请改用本地识别后端。")

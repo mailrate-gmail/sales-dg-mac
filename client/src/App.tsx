@@ -175,6 +175,7 @@ interface ModelConfig {
   whisper_model: string
   whisper_device: string
   whisper_compute_type: string
+  bilingual_asr_enabled: boolean
   funasr_model: string
   funasr_device: string
   oci_speech_region: string
@@ -270,6 +271,7 @@ const defaultConfig: ModelConfig = {
   whisper_model: 'small',
   whisper_device: 'cpu',
   whisper_compute_type: 'int8',
+  bilingual_asr_enabled: false,
   funasr_model: 'paraformer-zh-streaming',
   funasr_device: 'cpu',
   oci_speech_region: '',
@@ -1320,7 +1322,7 @@ export function App() {
       <section className="page-card">
         <div className="page-title">
           <h1>ASR Provider 配置</h1>
-          <p>配置语音识别后端、FunASR 模型、标点恢复和 OCI Speech 参数。</p>
+          <p>配置语音识别后端、FunASR 模型、双语增强、标点恢复和 OCI Speech 参数。</p>
         </div>
         <div className="config-grid">
           <label>ASR Provider
@@ -1332,9 +1334,15 @@ export function App() {
           </label>
           <label>FunASR Model<input value={config.funasr_model} onChange={(e) => updateConfig('funasr_model', e.target.value)} /></label>
           <label>FunASR Device<input value={config.funasr_device} onChange={(e) => updateConfig('funasr_device', e.target.value)} /></label>
+          <label>双语识别增强
+            <select value={config.bilingual_asr_enabled ? 'on' : 'off'} onChange={(e) => updateConfig('bilingual_asr_enabled', e.target.value === 'on')}>
+              <option value="off">关闭（默认，低延迟）</option>
+              <option value="on">开启（final 使用 faster-whisper 自动识别中英文）</option>
+            </select>
+          </label>
           <label>标点 Provider
             <select value={config.punctuation_provider} onChange={(e) => updateConfig('punctuation_provider', e.target.value as ModelConfig['punctuation_provider'])}>
-              <option value="funasr_punc">FunASR / ModelScope 标点模型（实时 final 推荐）</option>
+              <option value="funasr_punc">FunASR / HuggingFace 标点模型（实时 final 推荐）</option>
               <option value="asr">ASR / Whisper 原始标点（FunASR streaming 通常无标点）</option>
               <option value="rule">规则标点</option>
               <option value="off">关闭标点恢复</option>

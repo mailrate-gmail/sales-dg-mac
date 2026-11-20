@@ -13,6 +13,7 @@
 - 录入参会人声纹样本；
 - 基于浏览器 WebAudio 采集，按语音停顿 0.8s 切分；
 - 本地 FunASR streaming 实时转写（faster-whisper 作为短音频 fallback）；
+- 可选“双语识别增强”：开启后 final 音频会用 faster-whisper 自动语言识别增强中英文混合转写，失败时回退 FunASR streaming 结果；
 - 实时 final 文本默认使用 HuggingFace `funasr/ct-punc` 中文标点恢复模型；如切到 Whisper 等自身带标点的后端，也可选择信任 ASR 原始输出；partial 实时字幕最多做保守规则轻补，final 文本不再由前端二次补标点；
 - 本地 SpeechBrain 声纹匹配；
 - 手动修正消息说话人；
@@ -238,6 +239,7 @@ hf_cache/                # HuggingFace 缓存；FunASR streaming、ct-punc、ECA
 | 功能 | 模型 | 来源 |
 | --- | --- | --- |
 | 实时 ASR | `funasr/paraformer-zh-streaming` | HuggingFace |
+| 双语识别增强 | faster-whisper `small`（默认，可配置） | HuggingFace / faster-whisper 缓存 |
 | final 标点 | `funasr/ct-punc` | HuggingFace |
 | 声纹匹配/聚类 | `speechbrain/spkrec-ecapa-voxceleb` | HuggingFace |
 | 可选 cam++ diarization | `funasr/paraformer-zh` + `funasr/fsmn-vad` + `funasr/campplus` | HuggingFace |
