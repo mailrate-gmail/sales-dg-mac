@@ -3,15 +3,18 @@ from pathlib import Path
 from uuid import uuid4
 import asyncio
 import logging
+import secrets
 import wave
 import numpy as np
 
-from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import Body, FastAPI, File, Form, Header, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config import settings
 from app.models import (
     AgentMemory,
     AgentRunResponse,
+    ExternalTranscriptCreate,
     ExportResponse,
     ConnectionTestResponse,
     MeetingCreate,
@@ -65,6 +68,17 @@ def load_participants() -> list[Participant]:
 
 def save_participants(participants: list[Participant]) -> None:
     storage.write_json(storage.participants_file, [p.model_dump() for p in participants])
+
+
+def verify_transcript_ingest_token(authorization: str | None) -> None:
+    if not settings.transcript_ingest_token:
+        return
+    prefix = "Bearer "
+    if not authorization or not authorization.startswith(prefix):
+        raise HTTPException(status_code=401, detail="缺少 Android 转写写入授权。")
+    token = authorization[len(prefix) :]
+    if not secrets.compare_digest(token, settings.transcript_ingest_token):
+        raise HTTPException(status_code=401, detail="Android 转写写入授权无效。")
 
 
 def load_session(session_id: str) -> Session:
@@ -351,6 +365,73 @@ async def create_message_from_text_audio(
     return message
 
 
+def resolve_external_speaker_fields(payload: ExternalTranscriptCreate) -> dict:
+    participants = load_participants()
+    if payload.participant_id:
+        participant = next((item for item in participants if item.id == payload.participant_id), None)
+        if not participant:
+            raise HTTPException(status_code=404, detail="参会人不存在。")
+        return {
+            "participant_id": participant.id,
+            "speaker_identity_id": participant.id,
+            "speaker_name": participant.name,
+            "role": participant.role,
+            "need_reply": participant.need_reply,
+        }
+
+    speaker_name = (payload.speaker_name or "").strip() or "Android ASR"
+    return {
+        "participant_id": None,
+        "speaker_identity_id": None,
+        "speaker_name": speaker_name,
+        "role": payload.role,
+        "need_reply": False,
+    }
+
+
+async def create_message_from_external_transcript(
+    session: Session,
+    payload: ExternalTranscriptCreate,
+) -> Message:
+    text = payload.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="转写文本不能为空。")
+
+    fields = resolve_external_speaker_fields(payload)
+    analysis = context_manager.analyze_utterance(text)
+    suggestion = None
+    if context_manager.should_trigger_reply(fields["need_reply"], analysis):
+        history = "\n".join([f"{m.speaker_name}: {m.text}" for m in session.messages[-8:]])
+        suggestion = await llm_client.suggest_reply(
+            session.goal,
+            history,
+            text,
+            structured_context=structured_context_for_session(session),
+        )
+
+    message = Message(
+        id=f"message_{uuid4().hex[:10]}",
+        session_id=session.id,
+        participant_id=fields["participant_id"],
+        speaker_identity_id=fields["speaker_identity_id"],
+        speaker_name=fields["speaker_name"],
+        role=fields["role"],
+        text=text,
+        speaker_score=None,
+        need_reply=fields["need_reply"],
+        ai_suggestion=suggestion,
+        created_at=payload.recognized_at or now_iso(),
+        utterance_labels=analysis.labels,
+        should_reply=analysis.should_reply,
+        analysis_reason=analysis.reason,
+        source=payload.source,
+    )
+    session.messages.append(message)
+    save_session(session)
+    context_manager.update_with_message(session, message, analysis=analysis)
+    return message
+
+
 async def create_messages_from_pcm_segment(
     session: Session,
     original_text: str,
@@ -609,6 +690,21 @@ def get_meeting(meeting_id: str) -> Session:
 @app.post("/api/meetings/{meeting_id}/audio", response_model=list[Message])
 async def upload_meeting_audio(meeting_id: str, file: UploadFile = File(...)) -> list[Message]:
     return await process_audio_file(meeting_id, file)
+
+
+@app.post("/api/meetings/{meeting_id}/transcripts", response_model=Message)
+async def add_external_transcript(
+    meeting_id: str,
+    payload: ExternalTranscriptCreate,
+    authorization: str | None = Header(default=None),
+) -> Message:
+    """接收 Android / 外部 ASR 已识别文本。
+
+    方案 A：发言人由客户端手动选择，本接口不上传音频、不做声纹识别，降低手机端隐私风险。
+    """
+    verify_transcript_ingest_token(authorization)
+    session = load_session(meeting_id)
+    return await create_message_from_external_transcript(session, payload)
 
 
 @app.websocket("/api/meetings/{meeting_id}/asr/funasr/stream")

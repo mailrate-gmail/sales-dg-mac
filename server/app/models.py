@@ -62,6 +62,17 @@ class Message(BaseModel):
     utterance_labels: list[str] = Field(default_factory=list)
     should_reply: bool = False
     analysis_reason: str = ""
+    source: Optional[str] = None
+
+
+class ExternalTranscriptCreate(BaseModel):
+    text: str
+    participant_id: Optional[str] = None
+    speaker_name: Optional[str] = None
+    role: Role = "unknown"
+    need_reply: Optional[bool] = None
+    source: str = "android_system_asr"
+    recognized_at: Optional[str] = None
 
 
 class Session(BaseModel):

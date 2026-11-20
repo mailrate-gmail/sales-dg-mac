@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     server_host: str = "0.0.0.0"
     server_port: int = 8000
     data_dir: str = "/app/data"
+    transcript_ingest_token: str = ""
 
     whisper_model: str = "small"
     whisper_device: str = "cpu"

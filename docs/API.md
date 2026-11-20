@@ -220,7 +220,67 @@ curl -X POST \
 ]
 ```
 
-### 3.5 绑定识别个体 ID 与参会人员名称
+### 3.5 写入 Android / 外部 ASR 文本
+
+### POST `/api/meetings/{meeting_id}/transcripts`
+
+用于 Android 原生方案 A：手机端使用系统 ASR 识别文本并由用户手动选择发言人，然后只把文本写入后端。该接口**不上传音频、不做声纹识别**，用于降低手机端隐私风险和实现复杂度。
+
+如果服务端配置了：
+
+```env
+TRANSCRIPT_INGEST_TOKEN=your-token
+```
+
+调用方必须带：
+
+```http
+Authorization: Bearer your-token
+```
+
+**请求体**
+
+```json
+{
+  "text": "客户刚才问我们是否支持私有化部署。",
+  "participant_id": "participant_ab12cd34",
+  "speaker_name": "张总",
+  "role": "customer",
+  "need_reply": true,
+  "source": "android_system_asr",
+  "recognized_at": "2026-11-20T10:30:00"
+}
+```
+
+字段说明：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `text` | string | 是 | Android 系统 ASR 识别后的 final 文本，通常已带标点 |
+| `participant_id` | string | 否 | 已登记参会人 ID；传入后以后端参会人配置为准 |
+| `speaker_name` | string | 否 | 未传 `participant_id` 时使用的显示名称 |
+| `role` | string | 否 | `self` / `customer` / `other` / `unknown`，默认 `unknown` |
+| `need_reply` | boolean | 否 | 兼容字段；为安全起见，只有传入有效 `participant_id` 时才以后端参会人配置决定是否触发 AI 回复 |
+| `source` | string | 否 | 来源标记，默认 `android_system_asr` |
+| `recognized_at` | string | 否 | 手机端识别时间；不传则使用服务端接收时间 |
+
+> 安全约束：只有 `participant_id` 有效，且该参会人在后端配置为 `need_reply=true` 时，才可能自动生成 AI 回复。未登记的手动发言人只写入会议上下文，不触发 AI 自动回复。
+
+**curl 示例**
+
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-token" \
+  -d '{"text":"客户刚才问我们是否支持私有化部署。","participant_id":"participant_ab12cd34","source":"android_system_asr"}' \
+  http://localhost:8000/api/meetings/session_20261118_103000_a1b2c3/transcripts
+```
+
+**响应**
+
+返回写入后的 `Message`。后端会照常更新会议记忆，并在满足 `need_reply=true` 且本地规则判断为问题/明确请求时生成 AI 建议回复。
+
+### 3.6 绑定识别个体 ID 与参会人员名称
 
 ### PUT `/api/meetings/{meeting_id}/speakers/{speaker_identity_id}`
 
@@ -255,7 +315,7 @@ curl -X POST \
 }
 ```
 
-### 3.6 手动修正单条消息说话人
+### 3.7 手动修正单条消息说话人
 
 ### PUT `/api/sessions/{session_id}/messages/{message_id}/speaker`
 
@@ -282,7 +342,7 @@ curl -X POST \
 
 返回修正后的 `Message`。
 
-### 3.7 结束会议
+### 3.8 结束会议
 
 ### POST `/api/meetings/{meeting_id}/end`
 
@@ -292,7 +352,7 @@ curl -X POST \
 
 返回更新后的会议详情。
 
-### 3.8 生成会议总结
+### 3.9 生成会议总结
 
 ### POST `/api/meetings/{meeting_id}/summary`
 
@@ -306,7 +366,7 @@ curl -X POST \
 }
 ```
 
-### 3.9 导出会议 Markdown
+### 3.10 导出会议 Markdown
 
 ### POST `/api/meetings/{meeting_id}/export`
 
