@@ -185,6 +185,29 @@ extension DateFormatter {
     }()
 }
 
+func requestSpeechAndMicrophonePermissions(_ completion: @escaping @Sendable (Bool) -> Void) {
+    SFSpeechRecognizer.requestAuthorization { status in
+        AVCaptureDevice.requestAccess(for: .audio) { micGranted in
+            AgentLog.write("Permission result speech=\(status.rawValue) mic=\(micGranted)")
+            completion(status == .authorized && micGranted)
+        }
+    }
+}
+
+func makeAudioTapBlock(request: SFSpeechAudioBufferRecognitionRequest) -> AVAudioNodeTapBlock {
+    return { buffer, _ in
+        request.append(buffer)
+    }
+}
+
+func makeRecognitionResultHandler(
+    _ handler: @escaping @Sendable (SFSpeechRecognitionResult?, Error?) -> Void
+) -> (SFSpeechRecognitionResult?, Error?) -> Void {
+    return { result, error in
+        handler(result, error)
+    }
+}
+
 @MainActor
 final class TranscriptClient {
     private var config: AgentConfig
@@ -357,14 +380,18 @@ final class SpeechController {
         guard !running else { return }
         AgentLog.write("SpeechController.start")
         paused = false
-        requestPermissions { [weak self] granted in
-            guard let self else { return }
-            if granted {
-                self.beginRecognition()
-            } else {
-                self.window.append("麦克风或语音识别权限未授权")
-                AgentLog.write("Permission denied for microphone or speech recognition")
-                self.onStateChange(.error)
+        onStateChange(.loading)
+        AgentLog.write("Requesting speech/microphone permissions")
+        requestSpeechAndMicrophonePermissions { [weak self] granted in
+            Task { @MainActor in
+                guard let self else { return }
+                if granted {
+                    self.beginRecognition()
+                } else {
+                    self.window.append("麦克风或语音识别权限未授权")
+                    AgentLog.write("Permission denied for microphone or speech recognition")
+                    self.onStateChange(.error)
+                }
             }
         }
     }
@@ -387,19 +414,6 @@ final class SpeechController {
         stopRecognition(keepRunningFlag: false)
         window.append("已停止")
         onStateChange(.stopped)
-    }
-
-    private func requestPermissions(_ completion: @escaping @MainActor (Bool) -> Void) {
-        onStateChange(.loading)
-        AgentLog.write("Requesting speech/microphone permissions")
-        SFSpeechRecognizer.requestAuthorization { status in
-            AVCaptureDevice.requestAccess(for: .audio) { micGranted in
-                Task { @MainActor in
-                    AgentLog.write("Permission result speech=\(status.rawValue) mic=\(micGranted)")
-                    completion(status == .authorized && micGranted)
-                }
-            }
-        }
     }
 
     private func beginRecognition() {
@@ -427,13 +441,12 @@ final class SpeechController {
         let inputNode = audioEngine.inputNode
         let format = inputNode.outputFormat(forBus: 0)
         inputNode.removeTap(onBus: 0)
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
-            recognitionRequest.append(buffer)
-        }
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: format, block: makeAudioTapBlock(request: recognitionRequest))
 
         audioEngine.prepare()
         do {
             try audioEngine.start()
+            AgentLog.write("Audio engine started; recognition task running")
         } catch {
             window.append("麦克风启动失败：\(error.localizedDescription)")
             AgentLog.write("Audio engine start failed: \(error.localizedDescription)")
@@ -441,27 +454,29 @@ final class SpeechController {
             return
         }
 
-        recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+        recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest, resultHandler: makeRecognitionResultHandler { [weak self] result, error in
+            let recognizedText = result?.bestTranscription.formattedString.trimmingCharacters(in: .whitespacesAndNewlines)
+            let isFinal = result?.isFinal ?? false
+            let errorDescription = error?.localizedDescription
             Task { @MainActor in
                 guard let self else { return }
-                if let result {
-                    let text = result.bestTranscription.formattedString.trimmingCharacters(in: .whitespacesAndNewlines)
+                if let text = recognizedText {
                     if text != self.lastPartial {
                         self.lastPartial = text
                         self.window.append("识别中：\(text)")
                     }
-                    if result.isFinal {
+                    if isFinal {
                         self.transcriptClient.post(text: text, speaker: self.currentSpeaker)
                         self.restartIfNeeded()
                     }
                 }
-                if let error {
-                    self.window.append("识别任务结束：\(error.localizedDescription)")
-                    AgentLog.write("Recognition task ended: \(error.localizedDescription)")
+                if let errorDescription {
+                    self.window.append("识别任务结束：\(errorDescription)")
+                    AgentLog.write("Recognition task ended: \(errorDescription)")
                     self.restartIfNeeded()
                 }
             }
-        }
+        })
     }
 
     private func restartIfNeeded() {
