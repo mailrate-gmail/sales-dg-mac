@@ -94,8 +94,11 @@ def save_session(session: Session) -> None:
 
 
 def create_session_from_title_goal(title: str, goal: str) -> Session:
+    session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if storage.session_file(session_id).exists():
+        raise HTTPException(status_code=409, detail="会议 ID 已存在，请稍后重试。")
     session = Session(
-        id=f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:6]}",
+        id=session_id,
         title=title,
         goal=goal,
         started_at=now_iso(),

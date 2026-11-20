@@ -56,7 +56,7 @@ struct AgentConfig: Codable {
     static func sample() -> AgentConfig {
         AgentConfig(
             backendBaseURL: "http://localhost:8000",
-            meetingId: "session_xxx",
+            meetingId: defaultMeetingId(),
             ingestToken: nil,
             localeIdentifier: "zh-CN",
             speakers: [
@@ -67,19 +67,33 @@ struct AgentConfig: Codable {
         )
     }
 
+    static func defaultMeetingId() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd_HHmmss"
+        return formatter.string(from: Date())
+    }
+
     static func loadOrCreateSample() -> AgentConfig {
         let decoder = JSONDecoder()
-        if let data = try? Data(contentsOf: path), let config = try? decoder.decode(AgentConfig.self, from: data) {
+        if let data = try? Data(contentsOf: path), var config = try? decoder.decode(AgentConfig.self, from: data) {
+            if config.meetingId == "session_xxx" || config.meetingId.isEmpty {
+                config.meetingId = defaultMeetingId()
+                save(config)
+            }
             return config
         }
 
         let config = sample()
+        save(config)
+        return config
+    }
+
+    static func save(_ config: AgentConfig) {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         if let data = try? encoder.encode(config) {
             try? data.write(to: path, options: .atomic)
         }
-        return config
     }
 }
 
@@ -500,7 +514,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         windowController.append("配置文件：\(AgentConfig.path.path)")
         windowController.append("F1-F10 切换发言人，F11 暂停/继续，F12 退出，⌃⌥E 打开窗口")
 
-        if config.meetingId == "session_xxx" {
+        if config.meetingId.isEmpty {
             windowController.show()
             windowController.append("请先编辑配置文件中的 meetingId 和 speakers。")
         }

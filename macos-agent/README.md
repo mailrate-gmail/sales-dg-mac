@@ -67,7 +67,7 @@ tail -f ~/Library/Logs/SalesDGMacAgent/agent.log
   "backendBaseURL": "http://localhost:8000",
   "ingestToken": null,
   "localeIdentifier": "zh-CN",
-  "meetingId": "session_20261120_103000_abcd12",
+  "meetingId": "20261120_103000",
   "speakers": [
     {
       "key": 1,

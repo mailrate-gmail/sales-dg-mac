@@ -32,7 +32,7 @@ class TestExternalTranscript(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(fields["need_reply"])
 
     async def test_manual_speaker_writes_text_without_audio_or_llm_by_default(self):
-        session = Session(id="session_1", title="测试会谈", goal="测试", started_at="2026-11-20T10:00:00")
+        session = Session(id="20261120_100000", title="测试会谈", goal="测试", started_at="2026-11-20T10:00:00")
         payload = ExternalTranscriptCreate(
             text="客户说明了当前情况。",
             speaker_name="客户",
@@ -57,7 +57,7 @@ class TestExternalTranscript(unittest.IsolatedAsyncioTestCase):
         update_memory.assert_called_once()
 
     async def test_empty_text_raises_400(self):
-        session = Session(id="session_1", started_at="2026-11-20T10:00:00")
+        session = Session(id="20261120_100000", started_at="2026-11-20T10:00:00")
         payload = ExternalTranscriptCreate(text="   ")
         with self.assertRaises(HTTPException) as ctx:
             await create_message_from_external_transcript(session, payload)

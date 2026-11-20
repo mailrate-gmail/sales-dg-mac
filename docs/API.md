@@ -70,7 +70,9 @@ FastAPI 默认错误格式：
 
 ### POST `/api/meetings`
 
-创建一场会议。前端只需要传客户名称和会晤目标，开始时间由后端自动生成。
+创建一场会议。前端只需要传客户名称和会晤目标，开始时间由后端自动生成。会议 ID 使用本地时间的日期+时分秒格式：`yyyyMMdd_HHmmss`，例如 `20261118_103000`。
+
+> 如果同一秒内重复创建会议导致 ID 冲突，接口会返回 `409`，稍后重试即可。
 
 **请求体**
 
@@ -85,7 +87,7 @@ FastAPI 默认错误格式：
 
 ```json
 {
-  "id": "session_20261118_103000_a1b2c3",
+  "id": "20261118_103000",
   "title": "上海某某科技有限公司会谈",
   "goal": "了解客户当前业务痛点，并推动下一次需求调研。",
   "started_at": "2026-11-18T10:30:00",
@@ -106,7 +108,7 @@ FastAPI 默认错误格式：
 ```json
 [
   {
-    "id": "session_20261118_103000_a1b2c3",
+    "id": "20261118_103000",
     "title": "上海某某科技有限公司会谈",
     "goal": "了解客户当前业务痛点，并推动下一次需求调研。",
     "started_at": "2026-11-18T10:30:00",
@@ -133,7 +135,7 @@ FastAPI 默认错误格式：
 
 ```json
 {
-  "id": "session_20261118_103000_a1b2c3",
+  "id": "20261118_103000",
   "title": "上海某某科技有限公司会谈",
   "goal": "了解客户当前业务痛点，并推动下一次需求调研。",
   "started_at": "2026-11-18T10:30:00",
@@ -141,7 +143,7 @@ FastAPI 默认错误格式：
   "messages": [
     {
       "id": "message_1234567890",
-      "session_id": "session_20261118_103000_a1b2c3",
+      "session_id": "20261118_103000",
       "participant_id": null,
       "speaker_identity_id": "voice_ab12cd34",
       "speaker_name": "张经理",
@@ -193,7 +195,7 @@ multipart/form-data
 ```bash
 curl -X POST \
   -F "file=@speech.webm" \
-  http://localhost:8000/api/meetings/session_20261118_103000_a1b2c3/audio
+  http://localhost:8000/api/meetings/20261118_103000/audio
 ```
 
 **响应示例**
@@ -202,7 +204,7 @@ curl -X POST \
 [
   {
     "id": "message_1234567890_1",
-    "session_id": "session_20261118_103000_a1b2c3",
+    "session_id": "20261118_103000",
     "participant_id": null,
     "speaker_identity_id": "voice_ab12cd34",
     "speaker_name": "未知说话人",
@@ -273,7 +275,7 @@ curl -X POST \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your-token" \
   -d '{"text":"客户刚才问我们是否支持私有化部署。","participant_id":"participant_ab12cd34","source":"macos_speech_asr"}' \
-  http://localhost:8000/api/meetings/session_20261118_103000_a1b2c3/transcripts
+  http://localhost:8000/api/meetings/20261118_103000/transcripts
 ```
 
 **响应**
@@ -376,7 +378,7 @@ curl -X POST \
 
 ```json
 {
-  "file": "/app/data/exports/session_20261118_103000_a1b2c3.md"
+  "file": "/app/data/exports/20261118_103000.md"
 }
 ```
 
@@ -392,7 +394,7 @@ curl -X POST \
 
 ```json
 {
-  "meeting_id": "session_20261118_103000_a1b2c3",
+  "meeting_id": "20261118_103000",
   "goal": "了解客户当前业务痛点，并推动下一次需求调研。",
   "short_term_context": ["张经理: 我们线索跟进不及时。"],
   "context_notes": ["张经理: 比如我们现在线索是通过邮件同步的。"],
@@ -428,7 +430,7 @@ curl -X POST \
 ```json
 {
   "memory": {
-    "meeting_id": "session_20261118_103000_a1b2c3",
+    "meeting_id": "20261118_103000",
     "goal": "了解客户当前业务痛点，并推动下一次需求调研。",
     "short_term_context": [],
     "pain_points": [],
