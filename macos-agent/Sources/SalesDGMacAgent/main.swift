@@ -4,6 +4,30 @@ import Carbon
 import Foundation
 import Speech
 
+enum AgentLog {
+    static let directory = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/Logs/SalesDGMacAgent")
+    static let file = directory.appendingPathComponent("agent.log")
+    private static let lock = NSLock()
+
+    static func write(_ message: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let line = "\(ISO8601DateFormatter().string(from: Date()))  \(message)\n"
+        if let data = line.data(using: .utf8) {
+            if FileManager.default.fileExists(atPath: file.path), let handle = try? FileHandle(forWritingTo: file) {
+                _ = try? handle.seekToEnd()
+                _ = try? handle.write(contentsOf: data)
+                _ = try? handle.close()
+            } else {
+                try? data.write(to: file, options: .atomic)
+            }
+        }
+        fputs(line, stderr)
+    }
+}
+
 enum AgentState {
     case stopped
     case loading
@@ -139,8 +163,10 @@ final class TranscriptClient {
 
     func post(text: String, speaker: AgentConfig.Speaker?) {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        AgentLog.write("POST transcript begin speaker=\(speaker?.name ?? "-") text=\(text)")
         guard var components = URLComponents(string: config.backendBaseURL) else {
             window.append("后端地址无效：\(config.backendBaseURL)")
+            AgentLog.write("Invalid backendBaseURL: \(config.backendBaseURL)")
             return
         }
         components.path = "/api/meetings/\(config.meetingId)/transcripts"
@@ -174,15 +200,18 @@ final class TranscriptClient {
             Task { @MainActor in
                 if let error {
                     self?.window.append("写入后端失败：\(error.localizedDescription)")
+                    AgentLog.write("POST transcript failed error=\(error.localizedDescription)")
                     return
                 }
                 let status = (response as? HTTPURLResponse)?.statusCode ?? 0
                 if !(200...299).contains(status) {
                     let body = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
                     self?.window.append("写入后端失败 HTTP \(status)：\(body)")
+                    AgentLog.write("POST transcript failed status=\(status) body=\(body)")
                     return
                 }
                 self?.window.append("已写入后端：\(text)")
+                AgentLog.write("POST transcript ok status=\(status)")
             }
         }.resume()
     }
@@ -225,6 +254,7 @@ final class SpeechController {
 
     func start() {
         guard !running else { return }
+        AgentLog.write("SpeechController.start")
         paused = false
         requestPermissions { [weak self] granted in
             guard let self else { return }
@@ -232,6 +262,7 @@ final class SpeechController {
                 self.beginRecognition()
             } else {
                 self.window.append("麦克风或语音识别权限未授权")
+                AgentLog.write("Permission denied for microphone or speech recognition")
                 self.onStateChange(.error)
             }
         }
@@ -259,9 +290,11 @@ final class SpeechController {
 
     private func requestPermissions(_ completion: @escaping @MainActor (Bool) -> Void) {
         onStateChange(.loading)
+        AgentLog.write("Requesting speech/microphone permissions")
         SFSpeechRecognizer.requestAuthorization { status in
             AVCaptureDevice.requestAccess(for: .audio) { micGranted in
                 Task { @MainActor in
+                    AgentLog.write("Permission result speech=\(status.rawValue) mic=\(micGranted)")
                     completion(status == .authorized && micGranted)
                 }
             }
@@ -272,6 +305,7 @@ final class SpeechController {
         guard !paused else { return }
         guard let speechRecognizer, speechRecognizer.isAvailable else {
             window.append("系统语音识别当前不可用")
+            AgentLog.write("Speech recognizer unavailable")
             onStateChange(.error)
             return
         }
@@ -301,6 +335,7 @@ final class SpeechController {
             try audioEngine.start()
         } catch {
             window.append("麦克风启动失败：\(error.localizedDescription)")
+            AgentLog.write("Audio engine start failed: \(error.localizedDescription)")
             onStateChange(.error)
             return
         }
@@ -321,6 +356,7 @@ final class SpeechController {
                 }
                 if let error {
                     self.window.append("识别任务结束：\(error.localizedDescription)")
+                    AgentLog.write("Recognition task ended: \(error.localizedDescription)")
                     self.restartIfNeeded()
                 }
             }
@@ -437,7 +473,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotKeyManager: HotKeyManager!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AgentLog.write("applicationDidFinishLaunching")
         config = AgentConfig.loadOrCreateSample()
+        AgentLog.write("Loaded config path=\(AgentConfig.path.path) backend=\(config.backendBaseURL) meetingId=\(config.meetingId)")
         windowController = TranscriptWindowController()
         transcriptClient = TranscriptClient(config: config, window: windowController)
         speechController = SpeechController(config: config, window: windowController, transcriptClient: transcriptClient) { [weak self] state in
@@ -456,6 +494,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onShowWindow: { [weak self] in self?.windowController.show() }
         )
         hotKeyManager.install()
+        AgentLog.write("Hotkeys installed")
 
         windowController.setStatus("停止")
         windowController.append("配置文件：\(AgentConfig.path.path)")

@@ -21,6 +21,25 @@ cd macos-agent
 open SalesDGMacAgent.app
 ```
 
+如果双击或 `open` 后没有反应，用调试方式启动并查看错误：
+
+```bash
+cd macos-agent
+./run_debug.sh
+```
+
+运行日志会写入：
+
+```text
+~/Library/Logs/SalesDGMacAgent/agent.log
+```
+
+也可以实时查看：
+
+```bash
+tail -f ~/Library/Logs/SalesDGMacAgent/agent.log
+```
+
 首次启动会请求：
 
 - 麦克风权限；
