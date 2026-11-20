@@ -572,6 +572,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var transcriptClient: TranscriptClient!
     private var speechController: SpeechController!
     private var hotKeyManager: HotKeyManager!
+    private var currentState: AgentState = .stopped
+    private var currentSpeakerName = "未选"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AgentLog.write("applicationDidFinishLaunching")
@@ -583,10 +585,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.setState(state)
         }
 
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = statusImage(.stopped)
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem.button?.imagePosition = .imageLeading
         statusItem.button?.toolTip = "Sales-DG Mac Agent"
         statusItem.menu = makeMenu()
+        updateStatusBar()
 
         hotKeyManager = HotKeyManager(
             onSpeakerKey: { [weak self] index in self?.selectSpeaker(index) },
@@ -621,6 +624,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 AgentConfig.save(self.config)
                 self.transcriptClient.updateConfig(self.config)
                 self.windowController.append("server 已新建会议：\(meetingId)")
+                self.updateStatusBar()
                 self.speechController.start()
             case .failure(let error):
                 self.windowController.show()
@@ -655,11 +659,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func selectSpeaker(_ key: Int) {
         let speaker = config.speakers.first { $0.key == key }
+        currentSpeakerName = speaker?.name ?? "未选"
         speechController.setSpeaker(speaker)
+        updateStatusBar()
     }
 
     private func setState(_ state: AgentState) {
-        statusItem.button?.image = statusImage(state)
+        currentState = state
+        updateStatusBar()
         switch state {
         case .stopped:
             windowController.setStatus("停止")
@@ -672,6 +679,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .error:
             windowController.setStatus("异常")
         }
+    }
+
+    private func updateStatusBar() {
+        guard let button = statusItem?.button else { return }
+        button.image = statusImage(currentState)
+        button.title = " \(stateText(currentState)) \(shortMeetingId(config?.meetingId ?? "-")) \(currentSpeakerName)"
+        button.toolTip = "Sales-DG Mac Agent\n状态：\(stateText(currentState))\n会议：\(config?.meetingId ?? "-")\n发言人：\(currentSpeakerName)"
+    }
+
+    private func stateText(_ state: AgentState) -> String {
+        switch state {
+        case .stopped:
+            return "停止"
+        case .loading:
+            return "加载"
+        case .running:
+            return "运行"
+        case .paused:
+            return "暂停"
+        case .error:
+            return "异常"
+        }
+    }
+
+    private func shortMeetingId(_ meetingId: String) -> String {
+        guard meetingId.count >= 6 else { return meetingId }
+        return String(meetingId.suffix(6))
     }
 
     private func statusImage(_ state: AgentState) -> NSImage {
