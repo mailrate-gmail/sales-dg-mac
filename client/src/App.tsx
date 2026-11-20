@@ -10,6 +10,8 @@ const COMMA_MARKERS = ['但是', '不过', '所以', '因此', '然后', '另外
 const SPLIT_CANDIDATES = ['因为', '所以', '但是', '然后', '另外', '同时', '如果', '我们', '客户', '现在', '目前', '这个', '那个', '可以', '需要', '希望', '已经', '就是', '的话', '的时候', '之后']
 const MAX_PLAIN_CLAUSE_LENGTH = 42
 
+type ModelLoadPhase = 'stopped' | 'loading' | 'running'
+
 function escapeRegExp(text: string) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -357,6 +359,8 @@ export function App() {
   const [speakerPanelOpen, setSpeakerPanelOpen] = useState(true)
   const [energyLevel, setEnergyLevel] = useState(0)
   const [recordingStatus, setRecordingStatus] = useState('未开始录音')
+  const [modelLoadPhase, setModelLoadPhase] = useState<ModelLoadPhase>('stopped')
+  const [modelLoadNote, setModelLoadNote] = useState('点击“开始录音”后显示模型加载状态')
   const [config, setConfig] = useState<ModelConfig>(defaultConfig)
   const [connectionTest, setConnectionTest] = useState('')
   const [testingConnection, setTestingConnection] = useState(false)
@@ -669,12 +673,16 @@ export function App() {
       return
     }
 
+    setModelLoadPhase('loading')
+    setModelLoadNote('正在初始化麦克风、WebSocket 和本地模型...')
     activeSessionIdRef.current = sessionId
     let stream: MediaStream
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     } catch (error) {
       console.error(error)
+      setModelLoadPhase('stopped')
+      setModelLoadNote('麦克风不可用，模型未启动')
       alert('无法访问麦克风，请检查浏览器麦克风权限。')
       return
     }
@@ -699,6 +707,8 @@ export function App() {
     streamingReadyRef.current = false
 
     ws.onopen = () => {
+      setModelLoadPhase('loading')
+      setModelLoadNote('WebSocket 已连接，等待 FunASR streaming 就绪...')
       setRecordingStatus('FunASR 流式识别已连接，请开始讲话')
     }
     ws.onerror = () => {
@@ -725,9 +735,13 @@ export function App() {
       } else if (data.type === 'error') {
         setRecordingStatus(`流式识别错误：${data.message}`)
       } else if (data.type === 'loading') {
+        setModelLoadPhase('loading')
+        setModelLoadNote(data.message || 'FunASR 模型加载中...')
         setRecordingStatus(data.message || 'FunASR 模型加载中...')
       } else if (data.type === 'ready') {
         streamingReadyRef.current = true
+        setModelLoadPhase('running')
+        setModelLoadNote('实时识别链路已运行；按配置启用的增强模型会在 final 阶段按需加载。')
         setRecordingStatus('FunASR 流式识别已就绪，请开始讲话')
       }
     }
@@ -744,6 +758,7 @@ export function App() {
     }
 
     setRecording(true)
+    setModelLoadNote('录音已启动，等待识别服务返回就绪状态...')
     setRecordingStatus('监听中：请开始讲话')
   }
 
@@ -833,6 +848,8 @@ export function App() {
     audioContextRef.current = null
     setEnergyLevel(0)
     setRecording(false)
+    setModelLoadPhase('stopped')
+    setModelLoadNote('录音已停止，模型链路未运行')
     setRecordingStatus(status)
   }
 
@@ -1110,6 +1127,61 @@ export function App() {
 
   function updateConfig<K extends keyof ModelConfig>(key: K, value: ModelConfig[K]) {
     setConfig((current) => ({ ...current, [key]: value }))
+  }
+
+  function phaseFor(enabled: boolean): ModelLoadPhase {
+    return enabled ? modelLoadPhase : 'stopped'
+  }
+
+  function renderLoadItem(name: string, phase: ModelLoadPhase, detail: string) {
+    const labels: Record<ModelLoadPhase, string> = {
+      stopped: '停止',
+      loading: '加载中',
+      running: '运行',
+    }
+    return (
+      <div className="load-progress-item">
+        <div>
+          <strong>{name}</strong>
+          <span>{detail}</span>
+        </div>
+        <em className={`load-status ${phase}`}>{labels[phase]}</em>
+      </div>
+    )
+  }
+
+  function renderLoadProgress() {
+    const asrPhase = phaseFor(recording || modelLoadPhase === 'loading')
+    const punctuationPhase = phaseFor(config.punctuation_provider === 'funasr_punc' && (recording || modelLoadPhase === 'loading'))
+    const bilingualPhase = phaseFor(config.bilingual_asr_enabled && (recording || modelLoadPhase === 'loading'))
+    const speakerPhase = phaseFor(recording || modelLoadPhase === 'loading')
+    const diarizationPhase = phaseFor(config.speaker_diarization_enabled && (recording || modelLoadPhase === 'loading'))
+    const llmPhase = phaseFor(recording || modelLoadPhase === 'loading')
+
+    return (
+      <section className="page-card load-progress-section">
+        <div className="section-heading">
+          <div>
+            <h2>加载进度</h2>
+            <p className="muted">{modelLoadNote}</p>
+          </div>
+        </div>
+        <div className="load-progress-columns">
+          <div className="load-progress-card">
+            <h3>语音识别链路</h3>
+            {renderLoadItem('FunASR Streaming', asrPhase, config.funasr_model)}
+            {renderLoadItem('Final 标点恢复', punctuationPhase, config.punctuation_provider === 'funasr_punc' ? config.punctuation_model : config.punctuation_provider)}
+            {renderLoadItem('双语识别增强', bilingualPhase, config.bilingual_asr_enabled ? `faster-whisper ${config.whisper_model}` : '未开启')}
+          </div>
+          <div className="load-progress-card">
+            <h3>说话人 / AI 链路</h3>
+            {renderLoadItem('SpeechBrain ECAPA', speakerPhase, '声纹匹配与未知说话人聚类')}
+            {renderLoadItem('cam++ 说话人分离', diarizationPhase, config.speaker_diarization_enabled ? 'FunASR campplus' : '未开启')}
+            {renderLoadItem('AI 回复服务', llmPhase, config.llm_provider ? `${config.llm_provider} / ${config.llm_model}` : '未配置')}
+          </div>
+        </div>
+      </section>
+    )
   }
 
   return (
@@ -1472,6 +1544,8 @@ export function App() {
             </div>
           )}
         </section>
+
+        {renderLoadProgress()}
 
         <div className="room-columns">
           <section className="page-card conversation-card">
