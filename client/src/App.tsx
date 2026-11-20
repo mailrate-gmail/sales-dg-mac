@@ -95,8 +95,8 @@ interface AppRoute {
   meetingId?: string
 }
 
-function routeFromHash(hash = window.location.hash): AppRoute {
-  const value = hash.replace(/^#/, '') || '/new'
+function routeFromValue(value = '/new'): AppRoute {
+  value = value || '/new'
   if (value === '/history') return { page: 'history' }
   if (value === '/settings/model') return { page: 'modelSettings' }
   if (value === '/settings/asr') return { page: 'asrSettings' }
@@ -108,14 +108,21 @@ function routeFromHash(hash = window.location.hash): AppRoute {
   return { page: 'new' }
 }
 
-function hashForRoute(page: Page, meetingId?: string) {
-  if (page === 'history') return '#/history'
-  if (page === 'modelSettings') return '#/settings/model'
-  if (page === 'asrSettings') return '#/settings/asr'
-  if (page === 'voiceSettings') return '#/settings/voice'
-  if (page === 'themeSettings') return '#/settings/theme'
-  if (page === 'room') return meetingId ? `#/meetings/${encodeURIComponent(meetingId)}` : '#/room'
-  return '#/new'
+function routeFromLocation(): AppRoute {
+  if (window.location.hash.startsWith('#/')) {
+    return routeFromValue(window.location.hash.replace(/^#/, ''))
+  }
+  return routeFromValue(window.location.pathname || '/new')
+}
+
+function pathForRoute(page: Page, meetingId?: string) {
+  if (page === 'history') return '/history'
+  if (page === 'modelSettings') return '/settings/model'
+  if (page === 'asrSettings') return '/settings/asr'
+  if (page === 'voiceSettings') return '/settings/voice'
+  if (page === 'themeSettings') return '/settings/theme'
+  if (page === 'room') return meetingId ? `/meetings/${encodeURIComponent(meetingId)}` : '/room'
+  return '/new'
 }
 
 interface Participant {
@@ -339,7 +346,7 @@ function AgentMemoryBlock({ title, items }: { title: string; items: string[] }) 
 }
 
 export function App() {
-  const [page, setPage] = useState<Page>(() => routeFromHash().page)
+  const [page, setPage] = useState<Page>(() => routeFromLocation().page)
   const [theme, setTheme] = useState<Theme>('dark')
   const [menuCollapsed, setMenuCollapsed] = useState(false)
   const [customerName, setCustomerName] = useState('')
@@ -381,7 +388,7 @@ export function App() {
   const lastVoiceAtRef = useRef(0)
   const activeSessionIdRef = useRef('')
   const configRef = useRef(config)
-  const initialMeetingIdRef = useRef(routeFromHash().meetingId || '')
+  const initialMeetingIdRef = useRef(routeFromLocation().meetingId || '')
 
   useEffect(() => {
     configRef.current = config
@@ -392,8 +399,10 @@ export function App() {
   }, [theme])
 
   useEffect(() => {
-    if (!window.location.hash) {
-      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${hashForRoute(page)}`)
+    const route = routeFromLocation()
+    if (window.location.hash.startsWith('#/') || window.location.pathname === '/') {
+      const nextPath = pathForRoute(route.page, route.meetingId)
+      window.history.replaceState(null, '', `${nextPath}${window.location.search}`)
     }
     loadConfig()
     loadSessions()
@@ -403,8 +412,8 @@ export function App() {
   }, [])
 
   useEffect(() => {
-    function handleHashChange() {
-      const route = routeFromHash()
+    function handlePopState() {
+      const route = routeFromLocation()
       if (route.page === 'room' && route.meetingId && route.meetingId !== activeSessionIdRef.current) {
         void openSession(route.meetingId, false)
         return
@@ -413,8 +422,8 @@ export function App() {
       if (route.page === 'history') void loadSessions()
     }
 
-    window.addEventListener('hashchange', handleHashChange)
-    return () => window.removeEventListener('hashchange', handleHashChange)
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
   }, [])
 
   const recognizedSpeakers = useMemo(() => {
@@ -470,9 +479,9 @@ export function App() {
   function navigateTo(nextPage: Page, meetingId = sessionId) {
     setPage(nextPage)
     if (nextPage === 'history') void loadSessions()
-    const nextHash = hashForRoute(nextPage, nextPage === 'room' ? meetingId : undefined)
-    if (window.location.hash !== nextHash) {
-      window.location.hash = nextHash
+    const nextPath = pathForRoute(nextPage, nextPage === 'room' ? meetingId : undefined)
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState(null, '', nextPath)
     }
   }
 
