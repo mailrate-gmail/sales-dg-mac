@@ -661,7 +661,7 @@ code {
 
 .speaker-row {
   display: grid;
-  grid-template-columns: 170px minmax(220px, 1fr) 100px 90px 110px;
+  grid-template-columns: 170px minmax(90px, 0.33fr) 100px 90px 110px;
   gap: 10px;
   align-items: center;
   padding: 12px;
