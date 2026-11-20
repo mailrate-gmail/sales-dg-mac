@@ -86,6 +86,13 @@ function displayTranscriptText(text: string) {
   return value
 }
 
+function formatMessageTime(value?: string) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  return date.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
+
 type Role = 'self' | 'customer' | 'other' | 'unknown'
 type Page = 'new' | 'history' | 'modelSettings' | 'asrSettings' | 'voiceSettings' | 'themeSettings' | 'room'
 type Theme = 'dark' | 'light' | 'blue'
@@ -149,6 +156,7 @@ interface Message {
   corrected: boolean
   start_time?: number | null
   end_time?: number | null
+  created_at?: string
 }
 
 interface SessionDetail {
@@ -1582,6 +1590,7 @@ export function App() {
                     <strong>{message.speaker_name}{message.corrected ? '（已修正）' : ''}</strong>
                     <code>{getSpeakerIdentity(message)}</code>
                     {typeof message.start_time === 'number' && typeof message.end_time === 'number' && <span className="score">{message.start_time.toFixed(1)}s - {message.end_time.toFixed(1)}s</span>}
+                    <span className="score">识别时间：{formatMessageTime(message.created_at)}</span>
                     <span className="score">匹配分：{message.speaker_score?.toFixed(2) ?? '-'}</span>
                   </div>
                   <p>{message.text}</p>
