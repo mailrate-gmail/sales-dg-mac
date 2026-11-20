@@ -364,6 +364,7 @@ export function App() {
   const [summary, setSummary] = useState('')
   const [recording, setRecording] = useState(false)
   const [speakerPanelOpen, setSpeakerPanelOpen] = useState(true)
+  const [loadProgressOpen, setLoadProgressOpen] = useState(true)
   const [energyLevel, setEnergyLevel] = useState(0)
   const [recordingStatus, setRecordingStatus] = useState('未开始录音')
   const [modelLoadPhase, setModelLoadPhase] = useState<ModelLoadPhase>('stopped')
@@ -1174,21 +1175,28 @@ export function App() {
             <h2>加载进度</h2>
             <p className="muted">{modelLoadNote}</p>
           </div>
-        </div>
-        <div className="load-progress-columns">
-          <div className="load-progress-card">
-            <h3>语音识别链路</h3>
-            {renderLoadItem('FunASR Streaming', asrPhase, config.funasr_model)}
-            {renderLoadItem('Final 标点恢复', punctuationPhase, config.punctuation_provider === 'funasr_punc' ? config.punctuation_model : config.punctuation_provider)}
-            {renderLoadItem('双语识别增强', bilingualPhase, config.bilingual_asr_enabled ? `faster-whisper ${config.whisper_model}` : '未开启')}
-          </div>
-          <div className="load-progress-card">
-            <h3>说话人 / AI 链路</h3>
-            {renderLoadItem('SpeechBrain ECAPA', speakerPhase, '声纹匹配与未知说话人聚类')}
-            {renderLoadItem('cam++ 说话人分离', diarizationPhase, config.speaker_diarization_enabled ? 'FunASR campplus' : '未开启')}
-            {renderLoadItem('AI 回复服务', llmPhase, config.llm_provider ? `${config.llm_provider} / ${config.llm_model}` : '未配置')}
+          <div className="section-actions">
+            <button className="secondary-action" onClick={() => setLoadProgressOpen((open) => !open)}>
+              {loadProgressOpen ? '折叠' : '展开'}
+            </button>
           </div>
         </div>
+        {loadProgressOpen && (
+          <div className="load-progress-columns">
+            <div className="load-progress-card">
+              <h3>语音识别链路</h3>
+              {renderLoadItem('FunASR Streaming', asrPhase, config.funasr_model)}
+              {renderLoadItem('Final 标点恢复', punctuationPhase, config.punctuation_provider === 'funasr_punc' ? config.punctuation_model : config.punctuation_provider)}
+              {renderLoadItem('双语识别增强', bilingualPhase, config.bilingual_asr_enabled ? `faster-whisper ${config.whisper_model}` : '未开启')}
+            </div>
+            <div className="load-progress-card">
+              <h3>说话人 / AI 链路</h3>
+              {renderLoadItem('SpeechBrain ECAPA', speakerPhase, '声纹匹配与未知说话人聚类')}
+              {renderLoadItem('cam++ 说话人分离', diarizationPhase, config.speaker_diarization_enabled ? 'FunASR campplus' : '未开启')}
+              {renderLoadItem('AI 回复服务', llmPhase, config.llm_provider ? `${config.llm_provider} / ${config.llm_model}` : '未配置')}
+            </div>
+          </div>
+        )}
       </section>
     )
   }
@@ -1513,6 +1521,8 @@ export function App() {
           </div>
         </section>
 
+        {renderLoadProgress()}
+
         <section className="page-card speaker-panel">
           <div className="section-heading">
             <h2>参会人员</h2>
@@ -1553,8 +1563,6 @@ export function App() {
             </div>
           )}
         </section>
-
-        {renderLoadProgress()}
 
         <div className="room-columns">
           <section className="page-card conversation-card">
